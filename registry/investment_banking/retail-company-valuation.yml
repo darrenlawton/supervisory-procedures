@@ -1,0 +1,200 @@
+metadata:
+  id: investment_banking/retail-company-valuation
+  name: Retail Company Valuation Model
+  version: 1.0.0
+  schema_version: "1.1"
+  business_area: investment_banking
+  supervisor:
+    name: Your Full Name
+    email: your.name@bank.example.com
+    role: Head of Investment Banking Coverage — Retail
+  status: draft
+  created_at: "2026-02-23"
+  approved_at: null
+  approved_by: null
+  authorised_agents:
+    - ib-valuation-agent-prod
+
+context:
+  description: >
+    AI-assisted construction of valuation models for publicly listed and
+    private retail sector companies. The agent assembles comparable company
+    analysis (comps), discounted cash flow (DCF) inputs, and LBO model
+    parameters from internal and approved external data sources.
+  business_rationale: >
+    Reduces analyst time spent on data gathering and model setup from ~2 days
+    to ~3 hours, allowing coverage teams to focus on judgement-intensive work
+    such as assumption review and client presentation.
+  applicable_regulations:
+    - "FCA MAR — Market Abuse Regulation (insider information controls)"
+    - "FCA COBS 12.2 — Research independence requirements"
+    - "MiFID II — Conflicts of interest and research objectivity"
+  risk_classification: high
+
+scope:
+  approved_activities:
+    - Check the target company against the firm's restricted and watch lists prior to any data retrieval
+    - Retrieve public financial filings (10-K, 20-F, annual reports) for target and comparable companies
+    - Pull approved market data feeds for share price, EV, and trading multiples
+    - Calculate EV/EBITDA, P/E, EV/Sales, and EV/EBIT multiples for comparable companies
+    - Build DCF model inputs using normalised historical financials and published consensus forecasts
+    - Construct LBO model skeleton with standard leverage assumptions
+    - Flag data gaps or anomalies in source financials for analyst follow-up
+    - Generate a structured valuation summary report for senior banker review
+    - Package and deliver the approved valuation model to authorised recipients
+    - Log all data sources, versions, and assumptions to the audit trail
+
+constraints:
+  procedural_requirements:
+    - Confirm the target company is not on the firm's active M&A deal list before proceeding
+    - Source all market data exclusively from the approved vendor list
+    - Record the exact data source and retrieval timestamp for every input used
+    - Present the draft valuation output to a senior banker for review before any client use
+    - Obtain explicit sign-off from Coverage MD before the model is shared externally
+  unacceptable_actions:
+    - Use non-public (inside) information as a model input
+    - Publish or share the valuation with any external party without Coverage MD approval
+    - Override or suppress a flagged data anomaly without analyst acknowledgement
+    - Generate a final investment recommendation — the agent produces analysis only
+    - Access deal team data rooms for companies outside the approved coverage list
+
+hard_veto_triggers:
+  - id: inside-information-detected
+    description: >
+      An input data source is flagged as potentially containing material
+      non-public information (MNPI) about the target company.
+    condition_hint: data_source.mnpi_flag == true OR data_source.origin == "deal_room"
+    action: halt_and_escalate
+    escalation_contact: compliance-mnpi-desk@bank.example.com
+
+  - id: target-on-restricted-list
+    description: >
+      The target company appears on the firm's restricted or watch list,
+      indicating an active deal or conflict of interest.
+    condition_hint: restricted_list_check.match == true
+    action: halt_and_escalate
+    escalation_contact: conflicts-office@bank.example.com
+
+  - id: data-source-not-approved
+    description: >
+      The agent attempts to retrieve data from a vendor or source not on the
+      approved data vendor list.
+    action: halt_and_notify
+    escalation_contact: ib-data-governance@bank.example.com
+
+oversight_checkpoints:
+  workflow_checkpoints:
+    - id: restricted-list-cleared
+      name: Restricted List Check Complete
+      description: >
+        Confirm target company is not on the restricted or watch list
+        before any data retrieval or modelling begins.
+      checkpoint_type: approve
+      required: true
+      who_reviews: Compliance — Conflicts Office
+      sla_hours: 2
+
+    - id: valuation-senior-review
+      name: Senior Banker Valuation Review
+      description: >
+        Senior banker reviews the agent's draft valuation output, including
+        methodology, comparable selection, and DCF assumptions, before
+        any client use.
+      checkpoint_type: approve
+      required: true
+      who_reviews: VP or MD — Investment Banking Coverage
+      sla_hours: 24
+
+    - id: external-sharing-approval
+      name: External Distribution Sign-off
+      description: >
+        Coverage MD explicitly approves sharing the valuation model or
+        summary with any external party.
+      checkpoint_type: approve
+      required: true
+      who_reviews: Coverage Managing Director
+      sla_hours: 4
+
+  condition_triggered_checkpoints:
+    - id: data-anomaly-flagged
+      name: Financial Data Anomaly Review
+      trigger_condition: >
+        Agent flags a material inconsistency or anomaly in source financials
+        (e.g. restatement, non-recurring items exceeding 10% of EBITDA).
+      description: >
+        Analyst must acknowledge and document the anomaly before the model
+        proceeds. Agent output must note the anomaly in the final report.
+      checkpoint_type: review
+      who_reviews: Analyst or Associate — Investment Banking Coverage
+      sla_hours: 4
+
+    - id: private-company-target
+      name: Private Company — Enhanced Data Governance Review
+      trigger_condition: Target company is not publicly listed.
+      description: >
+        Private company valuations rely on non-public financial data subject
+        to NDA. Legal and compliance must confirm data usage is permissible
+        before modelling proceeds.
+      checkpoint_type: approve
+      who_reviews: Legal Counsel + Compliance
+      sla_hours: 48
+
+workflow:
+  steps:
+    - id: restricted-list-check
+      activity: "Check the target company against the firm's restricted and watch lists prior to any data retrieval"
+      veto_trigger: target-on-restricted-list
+      checkpoint: restricted-list-cleared
+
+    - id: log-list-check
+      activity: "Log all data sources, versions, and assumptions to the audit trail"
+
+    - id: retrieve-public-filings
+      activity: "Retrieve public financial filings (10-K, 20-F, annual reports) for target and comparable companies"
+      veto_trigger: data-source-not-approved
+
+    - id: log-filings-retrieved
+      activity: "Log all data sources, versions, and assumptions to the audit trail"
+
+    - id: pull-market-data
+      activity: "Pull approved market data feeds for share price, EV, and trading multiples"
+      veto_trigger: data-source-not-approved
+
+    - id: log-market-data-retrieved
+      activity: "Log all data sources, versions, and assumptions to the audit trail"
+
+    - id: calculate-trading-multiples
+      activity: "Calculate EV/EBITDA, P/E, EV/Sales, and EV/EBIT multiples for comparable companies"
+
+    - id: log-multiples-calculated
+      activity: "Log all data sources, versions, and assumptions to the audit trail"
+
+    - id: build-dcf-inputs
+      activity: "Build DCF model inputs using normalised historical financials and published consensus forecasts"
+      veto_trigger: inside-information-detected
+
+    - id: log-dcf-built
+      activity: "Log all data sources, versions, and assumptions to the audit trail"
+
+    - id: construct-lbo-skeleton
+      activity: "Construct LBO model skeleton with standard leverage assumptions"
+
+    - id: log-lbo-constructed
+      activity: "Log all data sources, versions, and assumptions to the audit trail"
+
+    - id: flag-data-anomalies
+      activity: "Flag data gaps or anomalies in source financials for analyst follow-up"
+
+    - id: generate-valuation-report
+      activity: "Generate a structured valuation summary report for senior banker review"
+      checkpoint: valuation-senior-review
+
+    - id: log-report-generated
+      activity: "Log all data sources, versions, and assumptions to the audit trail"
+
+    - id: deliver-model
+      activity: "Package and deliver the approved valuation model to authorised recipients"
+      checkpoint: external-sharing-approval
+
+    - id: log-delivery
+      activity: "Log all data sources, versions, and assumptions to the audit trail"
