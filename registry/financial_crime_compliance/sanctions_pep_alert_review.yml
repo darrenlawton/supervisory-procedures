@@ -1,0 +1,206 @@
+metadata:
+  id: financial_crime_compliance/sanctions-pep-alert-review
+  name: Sanctions and PEP Alert Review
+  version: 1.0.0
+  schema_version: "1.0"
+  business_area: financial_crime_compliance
+  supervisor:
+    name: Head of Financial Crime Compliance
+    email: financial-crime-compliance@bank.example.com
+    role: Head of Financial Crime Compliance
+  status: approved
+  created_at: "2025-01-15"
+  approved_at: "2025-02-01"
+  approved_by: group-risk-and-compliance-committee
+  authorised_agents:
+    - sanctions-review-agent-prod
+    - sanctions-review-agent-staging
+
+context:
+  description: >
+    AI-assisted first-pass review of sanctions screening and Politically Exposed
+    Person (PEP) alerts generated during customer onboarding and ongoing monitoring.
+    The agent works through the compliance team's standard operating procedure
+    checklist, presents a structured recommendation (Accept / Decline / Partial Match),
+    and hands off to a human compliance officer for final disposition. The agent does
+    not make binding decisions — it prepares the evidence package and proposes a
+    recommendation under the four-eyes principle.
+  business_rationale: >
+    Legacy rule-based sanctions screening generates false-positive rates exceeding 90%,
+    requiring 5–20 minutes of manual review per alert. Common names can generate
+    hundreds of PEP and sanctions hits simultaneously. AI-assisted review reduces the
+    time per alert to approximately 30 seconds for clear cases and ~1 minute for
+    partial matches, enabling the same compliance team to handle twice the alert
+    volume. This increases capacity to focus on genuinely suspicious cases while
+    delivering a faster, less friction-laden onboarding experience for legitimate customers.
+    Deployed under the Agentic Oversight Framework (AOF) four-eyes principle: all final
+    decisions remain with the human compliance officer.
+  applicable_regulations:
+    - "BSA/AML — Bank Secrecy Act / Anti-Money Laundering"
+    - "OFAC — US Office of Foreign Assets Control sanctions regulations"
+    - "HM Treasury — UK Consolidated Sanctions List"
+    - "EU Consolidated Sanctions List"
+    - "FinCEN — Joint Statement on Innovative Efforts to Combat Money Laundering (2018)"
+    - "Fed/OCC SR 11-7 — Model Risk Management framework"
+    - "ECOA — Equal Credit Opportunity Act (fairness in decisioning)"
+    - "FATF Recommendations — Politically Exposed Persons"
+  risk_classification: critical
+
+scope:
+  approved_activities:
+    - Query the OFAC Specially Designated Nationals list and HM Treasury/EU consolidated sanctions lists for name matches
+    - Query the PEP (Politically Exposed Person) database for name matches
+    - Query adverse media sources for references to the customer's name
+    - Match the customer's name, address, and date of birth as provided at onboarding against the name and attributes on each hit
+    - Translate customer names and document fields from non-Latin scripts or foreign languages to English for comparison
+    - Check that the customer's age is consistent with the platform's Terms of Use requirements
+    - Match the customer's state, city, and address fields against the location attributes of each sanctions or PEP hit
+    - Perform OSINT link traversal to corroborate or refute a hit (e.g. verify that a sanctions entry refers to a deceased individual)
+    - Corroborate hits with supplementary evidence including adverse media articles, LinkedIn profiles, or government publications
+    - "Classify each hit as: confirmed match, partial match (yellow flag), or false positive"
+    - Generate a structured evidence package summarising the data sources consulted, the reasoning followed, and the recommended disposition
+    - Present the recommendation (Accept / Decline / Partial Match) to the human compliance officer for final approval
+    - Log all data accesses, sources queried, reasoning steps, and recommended actions to the immutable audit trail
+
+constraints:
+  procedural_requirements:
+    - Follow the compliance team's sanctions and PEP alert review SOP checklist in full before issuing any recommendation
+    - Check all three matching dimensions for each hit — name, date of birth, and geographic location — before classifying the hit
+    - Translate all non-Latin or foreign-language name fields to English before performing name comparison
+    - Consult at least one supplementary evidence source (adverse media, government publication, or open-source record) before recommending Decline on a PEP or sanctions hit
+    - Assign a confidence score to the recommendation and log it alongside the evidence package
+    - Always present findings to a human compliance officer before any onboarding decision is recorded
+    - Record a timestamped, immutable audit log entry for every data source queried, every decision step taken, and the final recommendation
+    - When the confidence score falls below the defined threshold, treat the case as a Partial Match and escalate — do not recommend Accept
+  unacceptable_actions:
+    - Issue a final onboarding decision (approve or decline) without human compliance officer review and approval
+    - Clear a hit where the customer's name is an exact match on the OFAC SDN list or HM Treasury Consolidated List without human escalation
+    - Omit any checklist step from the SOP before issuing a recommendation
+    - Access or process customer personal data beyond what is required to review the current alert
+    - Share customer data or alert details with any third party not listed in the institution's data processing agreement
+    - Use nationality, ethnicity, religion, or other protected characteristics as a basis for flagging or clearing a hit
+    - Suppress, edit, or omit any step from the audit log
+    - Retain customer personal data beyond the regulatory retention period applicable to the jurisdiction
+
+hard_veto_triggers:
+  - id: exact-sanctions-list-match
+    description: >
+      The customer's full name and at least one additional identifier (date of birth,
+      nationality, or address) match an entry on the OFAC SDN list, HM Treasury
+      Consolidated Sanctions List, or EU Consolidated Sanctions List with high
+      confidence. Link traversal has not produced evidence sufficient to refute the match.
+    condition_hint: >
+      sanctions_hit.confidence >= 0.90 AND
+      (sanctions_hit.name_match == "exact" OR sanctions_hit.alias_match == "exact") AND
+      sanctions_hit.refuted_by_evidence == false
+    action: halt_and_escalate
+    escalation_contact: financial-crime-team@bank.example.com
+
+  - id: confidence-below-threshold
+    description: >
+      The agent's overall confidence in its recommendation falls below the minimum
+      acceptable threshold, indicating insufficient evidence to classify the alert
+      as either a clear false positive or a confirmed match.
+    condition_hint: recommendation_confidence_score < 0.70
+    action: halt_and_escalate
+    escalation_contact: financial-crime-team@bank.example.com
+
+  - id: active-criminal-investigation-found
+    description: >
+      Adverse media or open-source evidence indicates that the customer is the
+      subject of an active law enforcement investigation, criminal prosecution,
+      or regulatory enforcement action.
+    condition_hint: >
+      adverse_media_results.active_investigation == true OR
+      adverse_media_results.criminal_prosecution == true
+    action: halt_and_escalate
+    escalation_contact: financial-crime-team@bank.example.com
+
+  - id: conflicting-evidence-on-high-risk-hit
+    description: >
+      Multiple evidence sources return conflicting conclusions on a sanctions or
+      PEP hit classified as high-risk (e.g. one source indicates deceased, another
+      indicates active), and the conflict cannot be resolved by further link traversal
+      within the agent's permitted data sources.
+    condition_hint: >
+      hit.risk_level == "high" AND
+      evidence_sources.conflict_detected == true AND
+      link_traversal_exhausted == true
+    action: halt_and_escalate
+    escalation_contact: financial-crime-team@bank.example.com
+
+  - id: data-source-unavailable
+    description: >
+      One or more mandatory data sources (OFAC, HM Treasury, PEP database) are
+      unavailable or return an error, preventing the agent from completing the
+      required SOP checklist steps.
+    condition_hint: mandatory_data_sources.any_unavailable == true
+    action: halt_and_notify
+    escalation_contact: financial-crime-team@bank.example.com
+
+oversight_checkpoints:
+  workflow_checkpoints:
+    - id: evidence-package-review
+      name: Evidence Package Review
+      description: >
+        Before issuing a recommendation, the agent presents its complete evidence
+        package to the human compliance officer — including all data sources queried,
+        name and attribute match results, OSINT findings, confidence score, and the
+        proposed disposition. The officer reviews and validates the package.
+      checkpoint_type: review
+      required: true
+      who_reviews: Qualified compliance officer (BSA/AML certified)
+      sla_hours: 1
+
+    - id: final-disposition-approval
+      name: Final Disposition Approval
+      description: >
+        The human compliance officer makes the binding Accept, Decline, or Partial Match
+        disposition. The agent's recommendation is advisory only. The officer's decision
+        is recorded in the audit trail with their identity, timestamp, and any override
+        rationale.
+      checkpoint_type: approve
+      required: true
+      who_reviews: Qualified compliance officer (BSA/AML certified)
+      sla_hours: 1
+
+  condition_triggered_checkpoints:
+    - id: partial-match-senior-review
+      name: Partial Match — Senior Compliance Review
+      trigger_condition: >
+        The agent classifies the alert as a Partial Match (yellow flag) — sufficient
+        evidence to neither confirm nor clear the hit with high confidence.
+      description: >
+        Partial match cases require review by a senior compliance officer. The agent
+        provides a summary of the conflicting evidence and recommends the most
+        conservative available action pending human judgment.
+      checkpoint_type: approve
+      who_reviews: Senior compliance officer (BSA/AML, Grade 5+)
+      sla_hours: 4
+
+    - id: model-accuracy-deviation
+      name: Model Accuracy Deviation Alert
+      trigger_condition: >
+        The agent's rolling precision or recall metrics, as measured by the continuous
+        evaluation framework, deviate beyond the acceptable threshold from the baseline
+        established during backtesting and shadow-mode operation.
+      description: >
+        When performance degrades beyond acceptable bounds, the AI operations team is
+        notified to investigate model drift and initiate retraining if required. Alert
+        processing continues under enhanced human review until the deviation is resolved.
+      checkpoint_type: notify
+      who_reviews: AI Operations Team and Model Risk Committee
+
+    - id: novel-typology-detected
+      name: Novel Threat Typology Detected
+      trigger_condition: >
+        A human compliance officer overrides the agent's recommendation and notes in
+        their review that the case represents a new or emerging threat pattern not
+        covered by the current SOP or agent training data.
+      description: >
+        Novel typologies are escalated to the Financial Crime Intelligence team to assess
+        whether the SOP and agent training data require updating. The override and
+        rationale are logged and fed into the next evaluation cycle.
+      checkpoint_type: notify
+      who_reviews: Financial Crime Intelligence Team and AI Operations Team
+      sla_hours: 24
