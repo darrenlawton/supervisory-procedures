@@ -1,0 +1,139 @@
+"""YAML load + JSON Schema validation for skill files."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import yaml
+import jsonschema
+from jsonschema import Draft202012Validator, FormatChecker
+
+# Path to the bundled schema — resolved relative to this file
+_SCHEMA_PATH = Path(__file__).parent.parent.parent / "schema" / "skill.schema.json"
+
+_WILDCARD_AGENT = "*"
+
+
+class ValidationError(Exception):
+    """Raised when a skill file fails schema validation."""
+
+    def __init__(self, path: Path, errors: list[str]) -> None:
+        self.path = path
+        self.errors = errors
+        summary = "; ".join(errors)
+        super().__init__(f"{path}: {summary}")
+
+
+class ValidationWarning:
+    """Non-fatal validation warning (e.g. wildcard agent)."""
+
+    def __init__(self, path: Path, message: str) -> None:
+        self.path = path
+        self.message = message
+
+    def __str__(self) -> str:
+        return f"WARNING {self.path}: {self.message}"
+
+
+def _load_schema() -> dict[str, Any]:
+    with _SCHEMA_PATH.open() as f:
+        return json.load(f)
+
+
+def load_yaml(path: Path) -> dict[str, Any]:
+    """Load a YAML skill file and return as a dict. Raises ValueError on parse errors."""
+    try:
+        with path.open() as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"YAML parse error in {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: top-level YAML must be a mapping")
+    return data
+
+
+def validate_skill(
+    path: Path,
+    strict: bool = False,
+) -> list[ValidationWarning]:
+    """Validate a single skill YAML file against the JSON Schema.
+
+    Returns a (possibly empty) list of ValidationWarning objects.
+    Raises ValidationError if the skill is invalid.
+
+    In strict mode, warnings are also raised as errors.
+    """
+    data = load_yaml(path)
+    schema = _load_schema()
+
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    raw_errors = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
+
+    if raw_errors:
+        messages = [_format_jsonschema_error(e) for e in raw_errors]
+        raise ValidationError(path, messages)
+
+    warnings = _collect_warnings(path, data)
+
+    if strict and warnings:
+        raise ValidationError(path, [w.message for w in warnings])
+
+    return warnings
+
+
+def _collect_warnings(path: Path, data: dict[str, Any]) -> list[ValidationWarning]:
+    warnings: list[ValidationWarning] = []
+    agents: list[str] = data.get("metadata", {}).get("authorised_agents", [])
+    if _WILDCARD_AGENT in agents:
+        warnings.append(
+            ValidationWarning(
+                path,
+                "authorised_agents contains '*' — all agents are permitted. "
+                "Consider restricting to named agent IDs.",
+            )
+        )
+    status = data.get("metadata", {}).get("status", "")
+    if status == "approved":
+        if not data.get("metadata", {}).get("approved_at"):
+            warnings.append(
+                ValidationWarning(path, "status is 'approved' but approved_at is null")
+            )
+        if not data.get("metadata", {}).get("approved_by"):
+            warnings.append(
+                ValidationWarning(path, "status is 'approved' but approved_by is null")
+            )
+    return warnings
+
+
+def validate_directory(
+    directory: Path,
+    strict: bool = False,
+) -> tuple[list[tuple[Path, list[ValidationWarning]]], list[ValidationError]]:
+    """Validate all *.yml files under directory recursively.
+
+    Returns:
+        (successes, failures)
+        successes: list of (path, warnings) for valid skills
+        failures: list of ValidationError for invalid skills
+    """
+    yml_files = sorted(directory.rglob("*.yml"))
+    successes: list[tuple[Path, list[ValidationWarning]]] = []
+    failures: list[ValidationError] = []
+
+    for yml_path in yml_files:
+        try:
+            warnings = validate_skill(yml_path, strict=strict)
+            successes.append((yml_path, warnings))
+        except ValidationError as exc:
+            failures.append(exc)
+        except ValueError as exc:
+            failures.append(ValidationError(yml_path, [str(exc)]))
+
+    return successes, failures
+
+
+def _format_jsonschema_error(error: jsonschema.ValidationError) -> str:
+    path = " -> ".join(str(p) for p in error.absolute_path) if error.absolute_path else "root"
+    return f"[{path}] {error.message}"

@@ -1,0 +1,41 @@
+metadata:
+  id: test_area/draft-skill
+  name: Draft Skill
+  version: 0.1.0
+  schema_version: "1.0"
+  business_area: test_area
+  supervisor:
+    name: Test Supervisor
+    email: test@example.com
+    role: Test Manager
+  status: draft
+  created_at: "2024-01-01"
+  approved_at: null
+  approved_by: null
+  authorised_agents:
+    - test-agent-dev
+
+context:
+  description: A skill in draft status.
+  business_rationale: Testing status gate in access control.
+  applicable_regulations: []
+  risk_classification: low
+
+scope:
+  approved_activities:
+    - Test read operations
+
+constraints:
+  procedural_requirements:
+    - Log all actions
+  unacceptable_actions:
+    - Write any data
+
+hard_veto_triggers:
+  - id: test-veto
+    description: Test veto trigger.
+    action: halt_and_refuse
+
+oversight_checkpoints:
+  workflow_checkpoints: []
+  condition_triggered_checkpoints: []

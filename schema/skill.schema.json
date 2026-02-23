@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supervisory-procedures/schema/skill.schema.json",
+  "title": "Agent Skill",
+  "description": "Supervisory Procedures — Agent Skill definition schema v1.0",
+  "type": "object",
+  "required": [
+    "metadata",
+    "context",
+    "scope",
+    "constraints",
+    "hard_veto_triggers",
+    "oversight_checkpoints"
+  ],
+  "additionalProperties": false,
+  "properties": {
+
+    "metadata": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "version",
+        "schema_version",
+        "business_area",
+        "supervisor",
+        "status",
+        "created_at",
+        "approved_at",
+        "approved_by",
+        "authorised_agents"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+/[a-z0-9_-]+$",
+          "description": "<business_area>/<kebab-name>, e.g. retail_banking/loan-application-processing"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+          "description": "Semantic version, e.g. 1.0.0"
+        },
+        "schema_version": {
+          "type": "string",
+          "enum": ["1.0"],
+          "description": "Hub-controlled schema version"
+        },
+        "business_area": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Slug matching registry directory name"
+        },
+        "supervisor": {
+          "type": "object",
+          "required": ["name", "email", "role"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "email": { "type": "string", "format": "email" },
+            "role": { "type": "string", "minLength": 1 }
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "approved", "deprecated"]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date",
+          "description": "ISO 8601 date, e.g. 2024-01-15"
+        },
+        "approved_at": {
+          "oneOf": [
+            { "type": "string", "format": "date" },
+            { "type": "null" }
+          ]
+        },
+        "approved_by": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ]
+        },
+        "authorised_agents": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Agent IDs allowed to load this skill. ['*'] is permitted but triggers a CI warning."
+        }
+      }
+    },
+
+    "context": {
+      "type": "object",
+      "required": [
+        "description",
+        "business_rationale",
+        "applicable_regulations",
+        "risk_classification"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What business activity this skill governs"
+        },
+        "business_rationale": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why AI assistance is appropriate here"
+        },
+        "applicable_regulations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Regulatory references, e.g. FCA CONC 5.2"
+        },
+        "risk_classification": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        }
+      }
+    },
+
+    "scope": {
+      "type": "object",
+      "required": ["approved_activities"],
+      "additionalProperties": false,
+      "properties": {
+        "approved_activities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Exhaustive list of what the agent MAY do"
+        }
+      }
+    },
+
+    "constraints": {
+      "type": "object",
+      "required": ["procedural_requirements", "unacceptable_actions"],
+      "additionalProperties": false,
+      "properties": {
+        "procedural_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Steps the agent MUST follow"
+        },
+        "unacceptable_actions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Absolute prohibitions — must NEVER do"
+        }
+      }
+    },
+
+    "hard_veto_triggers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "action"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$",
+            "description": "Slug identifier, e.g. sanctions-hit"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain English description of the trigger condition"
+          },
+          "condition_hint": {
+            "type": "string",
+            "description": "Optional technical hint for agent developers"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "halt_and_escalate",
+              "halt_and_notify",
+              "halt_and_refuse"
+            ]
+          },
+          "escalation_contact": {
+            "type": "string",
+            "description": "Optional contact for escalation"
+          }
+        }
+      }
+    },
+
+    "oversight_checkpoints": {
+      "type": "object",
+      "required": ["workflow_checkpoints", "condition_triggered_checkpoints"],
+      "additionalProperties": false,
+      "properties": {
+        "workflow_checkpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "description",
+              "checkpoint_type",
+              "required",
+              "who_reviews"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]+$"
+              },
+              "name": { "type": "string", "minLength": 1 },
+              "description": { "type": "string", "minLength": 1 },
+              "checkpoint_type": {
+                "type": "string",
+                "enum": ["review", "approve", "notify", "halt"]
+              },
+              "required": { "type": "boolean" },
+              "who_reviews": { "type": "string", "minLength": 1 },
+              "sla_hours": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Optional SLA in hours"
+              }
+            }
+          }
+        },
+        "condition_triggered_checkpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "trigger_condition",
+              "description",
+              "checkpoint_type",
+              "who_reviews"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]+$"
+              },
+              "name": { "type": "string", "minLength": 1 },
+              "trigger_condition": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Plain English description of what triggers this checkpoint"
+              },
+              "description": { "type": "string", "minLength": 1 },
+              "checkpoint_type": {
+                "type": "string",
+                "enum": ["review", "approve", "notify", "halt"]
+              },
+              "who_reviews": { "type": "string", "minLength": 1 },
+              "sla_hours": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+
+  }
+}

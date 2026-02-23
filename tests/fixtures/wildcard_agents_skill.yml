@@ -1,0 +1,41 @@
+metadata:
+  id: test_area/wildcard-skill
+  name: Wildcard Agents Skill
+  version: 1.0.0
+  schema_version: "1.0"
+  business_area: test_area
+  supervisor:
+    name: Test Supervisor
+    email: test@example.com
+    role: Test Manager
+  status: approved
+  created_at: "2024-01-01"
+  approved_at: "2024-01-10"
+  approved_by: test-approver
+  authorised_agents:
+    - "*"
+
+context:
+  description: Skill with wildcard agent authorisation for warning testing.
+  business_rationale: Tests that wildcard triggers a validation warning.
+  applicable_regulations: []
+  risk_classification: low
+
+scope:
+  approved_activities:
+    - Read-only data access
+
+constraints:
+  procedural_requirements:
+    - Log all actions
+  unacceptable_actions:
+    - Modify any data
+
+hard_veto_triggers:
+  - id: test-veto
+    description: Test veto trigger.
+    action: halt_and_refuse
+
+oversight_checkpoints:
+  workflow_checkpoints: []
+  condition_triggered_checkpoints: []

@@ -1,0 +1,47 @@
+metadata:
+  id: test_area/test-skill
+  name: Test Skill
+  version: 1.0.0
+  schema_version: "1.0"
+  business_area: test_area
+  supervisor:
+    name: Test Supervisor
+    email: test@example.com
+    role: Test Manager
+  status: approved
+  created_at: "2024-01-01"
+  approved_at: "2024-01-10"
+  approved_by: test-approver
+  authorised_agents:
+    - test-agent-prod
+
+context:
+  description: A minimal skill used for testing purposes.
+  business_rationale: Needed to verify validation tooling works correctly.
+  applicable_regulations: []
+  risk_classification: low
+
+scope:
+  approved_activities:
+    - Perform read-only queries against the test database
+
+constraints:
+  procedural_requirements:
+    - Log every action to the audit trail
+  unacceptable_actions:
+    - Write or delete any data
+
+hard_veto_triggers:
+  - id: error-threshold-exceeded
+    description: The number of consecutive errors exceeds the allowed threshold.
+    action: halt_and_notify
+
+oversight_checkpoints:
+  workflow_checkpoints:
+    - id: initial-review
+      name: Initial Review
+      description: Review the output before proceeding.
+      checkpoint_type: review
+      required: true
+      who_reviews: Test reviewer
+  condition_triggered_checkpoints: []

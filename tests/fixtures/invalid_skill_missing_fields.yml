@@ -1,0 +1,11 @@
+# Invalid skill — missing required fields for testing validation failure
+metadata:
+  name: Incomplete Skill
+  # Missing: id, version, schema_version, business_area, supervisor, status,
+  #          created_at, approved_at, approved_by, authorised_agents
+
+context:
+  description: This skill is intentionally incomplete.
+  # Missing: business_rationale, applicable_regulations, risk_classification
+
+# Missing top-level blocks: scope, constraints, hard_veto_triggers, oversight_checkpoints

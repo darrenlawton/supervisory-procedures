@@ -1,0 +1,161 @@
+metadata:
+  id: retail_banking/loan-application-processing
+  name: Loan Application Processing
+  version: 1.0.0
+  schema_version: "1.0"
+  business_area: retail_banking
+  supervisor:
+    name: Sarah Johnson
+    email: sarah.johnson@bank.example.com
+    role: Head of Consumer Credit Operations
+  status: approved
+  created_at: "2024-01-15"
+  approved_at: "2024-02-01"
+  approved_by: compliance-review-board
+  authorised_agents:
+    - loan-processor-agent-prod
+    - loan-processor-agent-staging
+
+context:
+  description: >
+    AI-assisted processing of personal loan applications. The agent reviews
+    submitted documentation, runs automated eligibility checks, prepares a
+    recommendation for the underwriter, and communicates decisions to applicants.
+  business_rationale: >
+    AI assistance reduces manual processing time from ~4 hours to ~30 minutes per
+    application, enabling faster decisions for customers while freeing underwriters
+    to focus on complex edge cases and final approval.
+  applicable_regulations:
+    - "FCA CONC 5.2 — Creditworthiness assessment"
+    - "FCA CONC 7.3 — Arrears and default"
+    - "ICO UK GDPR — Automated decision-making (Article 22)"
+    - "Equality Act 2010 — Protected characteristics"
+  risk_classification: high
+
+scope:
+  approved_activities:
+    - Retrieve and parse submitted application documents (proof of income, ID)
+    - Query the internal credit scoring system for the applicant's risk score
+    - Cross-reference applicant details against the sanctions screening database
+    - Calculate debt-to-income ratio using declared and verified income figures
+    - Generate a structured recommendation report for the human underwriter
+    - Send templated acknowledgement and status-update emails to the applicant
+    - Log all actions and data accesses to the audit trail
+
+constraints:
+  procedural_requirements:
+    - Verify applicant identity against two independent sources before proceeding
+    - Run sanctions screening before any credit check is initiated
+    - Record a timestamped audit log entry for every data access and decision step
+    - Present the structured recommendation to a human underwriter before any offer is issued
+    - Obtain explicit underwriter approval before communicating a lending decision to the applicant
+    - Apply consistent evaluation criteria across all applications regardless of applicant demographics
+  unacceptable_actions:
+    - Issue a loan offer or rejection directly to the applicant without underwriter approval
+    - Access or store applicant data beyond what is required for this application
+    - Override or bypass a sanctions screening match
+    - Use demographic characteristics (age, ethnicity, religion, gender, disability) as inputs to scoring
+    - Share application data with third parties not listed in the data processing agreement
+    - Retain applicant personal data beyond the 7-year regulatory retention period
+
+hard_veto_triggers:
+  - id: sanctions-match
+    description: >
+      A positive match is returned when the applicant's name and date of birth
+      are checked against the HM Treasury or OFAC consolidated sanctions lists.
+    condition_hint: >
+      sanctions_screening_result.match_confidence >= 0.85 OR
+      sanctions_screening_result.exact_match == true
+    action: halt_and_escalate
+    escalation_contact: financial-crime-team@bank.example.com
+
+  - id: identity-verification-failure
+    description: >
+      The agent cannot verify the applicant's identity against two independent
+      sources after exhausting available verification methods.
+    action: halt_and_notify
+    escalation_contact: underwriting-team@bank.example.com
+
+  - id: data-quality-critical
+    description: >
+      Critical data required for a compliant creditworthiness assessment is
+      missing or cannot be retrieved (e.g. credit bureau unavailable, income
+      documents unreadable).
+    condition_hint: required_fields_missing.count > 0 OR external_service_errors.critical == true
+    action: halt_and_notify
+    escalation_contact: underwriting-team@bank.example.com
+
+  - id: protected-characteristic-detected
+    description: >
+      A data source or scoring model attempts to supply a protected characteristic
+      (age band excepted by FCA) as a model feature.
+    condition_hint: feature_flags.contains_protected_characteristic == true
+    action: halt_and_escalate
+    escalation_contact: ethics-and-compliance@bank.example.com
+
+oversight_checkpoints:
+  workflow_checkpoints:
+    - id: identity-verified
+      name: Identity Verification Complete
+      description: >
+        Confirm that the applicant's identity has been successfully verified
+        against two independent sources before credit assessment begins.
+      checkpoint_type: approve
+      required: true
+      who_reviews: Automated — passes automatically on dual-source match; escalates on failure
+      sla_hours: 1
+
+    - id: creditworthiness-assessment-review
+      name: Creditworthiness Assessment Review
+      description: >
+        Human underwriter reviews the agent's structured recommendation report,
+        including credit score, debt-to-income ratio, and supporting documentation.
+      checkpoint_type: approve
+      required: true
+      who_reviews: Qualified underwriter (minimum Grade 3 accreditation)
+      sla_hours: 24
+
+    - id: decision-communication
+      name: Lending Decision Communication
+      description: >
+        After underwriter approval, notify applicant of the lending decision
+        via templated email. Declined applications must include a reason code
+        for the customer to request a manual review.
+      checkpoint_type: notify
+      required: true
+      who_reviews: Underwriter (approved the decision)
+
+  condition_triggered_checkpoints:
+    - id: borderline-credit-score
+      name: Borderline Credit Score — Senior Review
+      trigger_condition: >
+        Applicant credit score falls within the borderline band (580–640)
+        as defined in the current underwriting policy.
+      description: >
+        Applications with borderline credit scores require review by a senior
+        underwriter to ensure consistent application of lending policy.
+      checkpoint_type: review
+      who_reviews: Senior underwriter (Grade 5+)
+      sla_hours: 48
+
+    - id: high-value-application
+      name: High-Value Loan Application Review
+      trigger_condition: Requested loan amount exceeds £50,000.
+      description: >
+        Loan applications above the high-value threshold require dual-approval:
+        both a qualified underwriter and the Head of Consumer Credit must sign off.
+      checkpoint_type: approve
+      who_reviews: Underwriter + Head of Consumer Credit
+      sla_hours: 48
+
+    - id: suspected-fraud-indicators
+      name: Fraud Indicators Detected
+      trigger_condition: >
+        Two or more fraud indicator flags are raised during document verification
+        (e.g. inconsistent employment records, mismatched address history, altered document metadata).
+      description: >
+        Halt processing and refer the application to the Financial Crime team
+        for manual investigation before any further action is taken.
+      checkpoint_type: halt
+      who_reviews: Financial Crime Investigation Team
+      sla_hours: 4
