@@ -39,3 +39,9 @@ hard_veto_triggers:
 oversight_checkpoints:
   workflow_checkpoints: []
   condition_triggered_checkpoints: []
+
+workflow:
+  steps:
+    - id: read-data
+      activity: "Read-only data access"
+      veto_trigger: test-veto

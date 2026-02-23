@@ -2,7 +2,7 @@ metadata:
   id: financial_crime_compliance/sanctions-pep-alert-review
   name: Sanctions and PEP Alert Review
   version: 1.0.0
-  schema_version: "1.0"
+  schema_version: "1.1"
   business_area: financial_crime_compliance
   supervisor:
     name: Head of Financial Crime Compliance
@@ -204,3 +204,52 @@ oversight_checkpoints:
       checkpoint_type: notify
       who_reviews: Financial Crime Intelligence Team and AI Operations Team
       sla_hours: 24
+
+workflow:
+  steps:
+    - id: query-sanctions-lists
+      activity: "Query the OFAC Specially Designated Nationals list and HM Treasury/EU consolidated sanctions lists for name matches"
+      veto_trigger: data-source-unavailable
+
+    - id: query-pep-database
+      activity: "Query the PEP (Politically Exposed Person) database for name matches"
+      veto_trigger: data-source-unavailable
+
+    - id: query-adverse-media
+      activity: "Query adverse media sources for references to the customer's name"
+      veto_trigger: active-criminal-investigation-found
+
+    - id: translate-names
+      activity: "Translate customer names and document fields from non-Latin scripts or foreign languages to English for comparison"
+
+    - id: check-age
+      activity: "Check that the customer's age is consistent with the platform's Terms of Use requirements"
+
+    - id: match-attributes
+      activity: "Match the customer's name, address, and date of birth as provided at onboarding against the name and attributes on each hit"
+
+    - id: match-location
+      activity: "Match the customer's state, city, and address fields against the location attributes of each sanctions or PEP hit"
+
+    - id: osint-traversal
+      activity: "Perform OSINT link traversal to corroborate or refute a hit (e.g. verify that a sanctions entry refers to a deceased individual)"
+      veto_trigger: conflicting-evidence-on-high-risk-hit
+
+    - id: corroborate-evidence
+      activity: "Corroborate hits with supplementary evidence including adverse media articles, LinkedIn profiles, or government publications"
+
+    - id: classify-hits
+      activity: "Classify each hit as: confirmed match, partial match (yellow flag), or false positive"
+      veto_trigger: exact-sanctions-list-match
+
+    - id: generate-evidence-package
+      activity: "Generate a structured evidence package summarising the data sources consulted, the reasoning followed, and the recommended disposition"
+      veto_trigger: confidence-below-threshold
+      checkpoint: evidence-package-review
+
+    - id: present-recommendation
+      activity: "Present the recommendation (Accept / Decline / Partial Match) to the human compliance officer for final approval"
+      checkpoint: final-disposition-approval
+
+    - id: log-audit
+      activity: "Log all data accesses, sources queried, reasoning steps, and recommended actions to the immutable audit trail"

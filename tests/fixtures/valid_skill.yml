@@ -45,3 +45,10 @@ oversight_checkpoints:
       required: true
       who_reviews: Test reviewer
   condition_triggered_checkpoints: []
+
+workflow:
+  steps:
+    - id: run-query
+      activity: "Perform read-only queries against the test database"
+      veto_trigger: error-threshold-exceeded
+      checkpoint: initial-review

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://supervisory-procedures/schema/skill.schema.json",
   "title": "Agent Skill",
-  "description": "Supervisory Procedures — Agent Skill definition schema v1.0",
+  "description": "Supervisory Procedures — Agent Skill definition schema v1.1",
   "type": "object",
   "required": [
     "metadata",
@@ -10,7 +10,8 @@
     "scope",
     "constraints",
     "hard_veto_triggers",
-    "oversight_checkpoints"
+    "oversight_checkpoints",
+    "workflow"
   ],
   "additionalProperties": false,
   "properties": {
@@ -48,13 +49,18 @@
         },
         "schema_version": {
           "type": "string",
-          "enum": ["1.0"],
+          "enum": ["1.0", "1.1"],
           "description": "Hub-controlled schema version"
         },
         "business_area": {
           "type": "string",
           "pattern": "^[a-z0-9_]+$",
           "description": "Slug matching registry directory name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["standard", "shared"],
+          "description": "Skill type. 'shared' indicates a centrally-maintained helper skill in registry/shared/ available for reuse across business areas."
         },
         "supervisor": {
           "type": "object",
@@ -274,6 +280,78 @@
                 "minimum": 1
               }
             }
+          }
+        }
+      }
+    },
+
+    "workflow": {
+      "type": "object",
+      "description": "The ordered sequence of steps the agent must follow to execute this skill.",
+      "required": ["steps"],
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Each step maps 1:1 to an approved_activity. Steps are executed in order.",
+          "items": {
+            "type": "object",
+            "required": ["id", "activity"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$",
+                "description": "Unique slug identifier for this step within the workflow."
+              },
+              "activity": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Must match exactly one entry in scope.approved_activities."
+              },
+              "veto_trigger": {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]+$",
+                "description": "ID of a hard_veto_trigger to evaluate after this step completes."
+              },
+              "checkpoint": {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]+$",
+                "description": "ID of an oversight_checkpoint that gates progression to the next step."
+              },
+              "uses_skill": {
+                "type": "string",
+                "pattern": "^shared/[a-z0-9_-]+$",
+                "description": "ID of a centrally-maintained helper skill in registry/shared/ that executes this step."
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "helper_skills": {
+      "type": "array",
+      "description": "Centrally-maintained helper skills from registry/shared/ that this skill delegates to in its workflow.",
+      "items": {
+        "type": "object",
+        "required": ["id", "purpose"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^shared/[a-z0-9_-]+$",
+            "description": "Skill ID in the shared registry, e.g. shared/audit-logging."
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Why this helper skill is used in this workflow."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this helper skill is required for the workflow to execute."
           }
         }
       }

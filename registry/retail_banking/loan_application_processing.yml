@@ -2,7 +2,7 @@ metadata:
   id: retail_banking/loan-application-processing
   name: Loan Application Processing
   version: 1.0.0
-  schema_version: "1.0"
+  schema_version: "1.1"
   business_area: retail_banking
   supervisor:
     name: Sarah Johnson
@@ -159,3 +159,47 @@ oversight_checkpoints:
       checkpoint_type: halt
       who_reviews: Financial Crime Investigation Team
       sla_hours: 4
+
+workflow:
+  steps:
+    - id: retrieve-documents
+      activity: "Retrieve and parse submitted application documents (proof of income, ID)"
+      veto_trigger: data-quality-critical
+      checkpoint: identity-verified
+
+    - id: log-documents-retrieved
+      activity: "Log all actions and data accesses to the audit trail"
+
+    - id: sanctions-screening
+      activity: "Cross-reference applicant details against the sanctions screening database"
+      veto_trigger: sanctions-match
+
+    - id: log-sanctions-complete
+      activity: "Log all actions and data accesses to the audit trail"
+
+    - id: credit-score
+      activity: "Query the internal credit scoring system for the applicant's risk score"
+      veto_trigger: protected-characteristic-detected
+
+    - id: log-credit-retrieved
+      activity: "Log all actions and data accesses to the audit trail"
+
+    - id: calculate-dti
+      activity: "Calculate debt-to-income ratio using declared and verified income figures"
+
+    - id: log-dti-calculated
+      activity: "Log all actions and data accesses to the audit trail"
+
+    - id: send-progress-notification
+      activity: "Send templated acknowledgement and status-update emails to the applicant"
+
+    - id: generate-recommendation
+      activity: "Generate a structured recommendation report for the human underwriter"
+      checkpoint: creditworthiness-assessment-review
+
+    - id: log-recommendation-generated
+      activity: "Log all actions and data accesses to the audit trail"
+
+    - id: notify-applicant-decision
+      activity: "Send templated acknowledgement and status-update emails to the applicant"
+      checkpoint: decision-communication

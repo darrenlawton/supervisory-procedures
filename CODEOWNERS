@@ -16,9 +16,14 @@
 # Registry root (README, structure) — hub only
 /registry/README.md             @org/central-innovation-team
 
+# Shared registry — centrally-maintained helper skills, owned by hub
+# Only create a shared skill when genuine reuse exists across ≥2 business areas
+/registry/shared/               @org/central-innovation-team
+
 # Spoke teams: each business area is owned by its supervisors
 # Add a new line here when a new business area directory is created
-/registry/retail_banking/       @org/retail-banking-supervisors
-# /registry/commercial_lending/ @org/commercial-lending-supervisors
-# /registry/wealth_management/  @org/wealth-management-supervisors
-# /registry/insurance/          @org/insurance-supervisors
+/registry/retail_banking/               @org/retail-banking-supervisors
+/registry/financial_crime_compliance/   @org/financial-crime-compliance-supervisors
+# /registry/commercial_lending/         @org/commercial-lending-supervisors
+# /registry/wealth_management/          @org/wealth-management-supervisors
+# /registry/insurance/                  @org/insurance-supervisors
