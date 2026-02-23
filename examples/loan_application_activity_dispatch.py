@@ -1,9 +1,14 @@
-"""Demonstrates how approved_activities link to Python functions via ActivityGuard.
+"""Demonstrates workflow-driven execution using the skill's workflow.steps definition.
 
-Each string in scope.approved_activities is the human-readable name for a permitted
-operation. At runtime, the agent maps that string to a concrete Python callable through
-an ActivityGuard. Attempting to call any function NOT registered to an approved activity
-raises ActivityNotPermittedError — the skill's allowlist is enforced in code.
+The supervisor-authored workflow block in the skill YAML defines:
+  - The ordered sequence of steps
+  - Which veto trigger to evaluate after each step
+  - Which oversight checkpoint gates progression after each step
+
+WorkflowRunner reads skill["workflow"]["steps"] at runtime and executes them
+in order. The agent provides activity implementations, per-step kwargs,
+veto evaluators, and checkpoint handlers — but it does NOT control the sequence.
+The sequence is owned by the supervisor.
 
 Run from the project root:
     pip install -e .
@@ -14,78 +19,162 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-import textwrap
 from typing import Any, Callable
 
 from supervisory_procedures.core.registry import SkillRegistry
 
 
 # ---------------------------------------------------------------------------
-# ActivityGuard — binds approved_activities strings to callables
+# Exceptions
 # ---------------------------------------------------------------------------
 
-class ActivityNotPermittedError(PermissionError):
-    """Raised when an agent attempts to call a function that has no corresponding
-    approved_activity in the loaded skill."""
+class VetoTriggeredError(Exception):
+    """Raised when a hard_veto_trigger fires during workflow execution."""
 
-    def __init__(self, activity: str, skill_id: str) -> None:
+    def __init__(self, veto_id: str, action: str, contact: str) -> None:
+        self.veto_id = veto_id
+        self.action = action
+        self.escalation_contact = contact
+        msg = f"Veto '{veto_id}' triggered — action: {action}"
+        if contact:
+            msg += f", escalate to: {contact}"
+        super().__init__(msg)
+
+
+class CheckpointBlockedError(Exception):
+    """Raised when an oversight checkpoint does not pass."""
+
+    def __init__(self, checkpoint_id: str, who_reviews: str) -> None:
+        self.checkpoint_id = checkpoint_id
+        self.who_reviews = who_reviews
         super().__init__(
-            f"Activity '{activity}' is not listed in approved_activities "
-            f"for skill '{skill_id}'. Agent may not perform this action."
+            f"Checkpoint '{checkpoint_id}' blocked — awaiting review by: {who_reviews}"
         )
 
 
-class ActivityGuard:
-    """Binds approved_activities strings to Python callables.
+# ---------------------------------------------------------------------------
+# WorkflowRunner — drives execution from skill["workflow"]["steps"]
+# ---------------------------------------------------------------------------
 
-    Provides a single entry point — .run(activity_name, **kwargs) — that:
-      1. Checks the activity string is in the skill's approved_activities list.
-      2. Looks up the registered callable.
-      3. Calls it, logging each invocation for the audit trail.
+class WorkflowRunner:
+    """Executes the workflow defined in the skill YAML.
 
-    Any function called outside of .run() bypasses governance; that is intentional
-    — agents should only call functions through the guard.
+    The supervisor-authored workflow.steps define the sequence, veto triggers,
+    and oversight checkpoints. The agent provides:
+      - Activity implementations  via .register(activity, fn)
+      - Per-step kwargs            via .set_step_kwargs(step_id, dict | callable)
+      - Veto evaluators            via .register_veto(veto_id, fn)
+      - Checkpoint handlers        via .register_checkpoint(checkpoint_id, fn)
+
+    Each step's kwargs callable receives the dict of results accumulated so far,
+    keyed by step_id — allowing later steps to reference earlier outputs.
+
+    The agent never controls sequencing. If a step is not in workflow.steps,
+    it will not be called. If an activity is not in approved_activities, it
+    cannot be registered.
     """
 
     def __init__(self, skill_data: dict[str, Any]) -> None:
         self._skill_id: str = skill_data["metadata"]["id"]
         self._approved: set[str] = set(skill_data["scope"]["approved_activities"])
-        self._registry: dict[str, Callable] = {}
+        self._steps: list[dict] = skill_data["workflow"]["steps"]
+        self._veto_index: dict[str, dict] = {
+            v["id"]: v for v in skill_data["hard_veto_triggers"]
+        }
+        self._checkpoint_index: dict[str, dict] = {
+            cp["id"]: cp
+            for cp in skill_data["oversight_checkpoints"]["workflow_checkpoints"]
+        }
+        self._activity_registry: dict[str, Callable] = {}
+        self._step_kwargs: dict[str, dict | Callable] = {}
+        self._veto_evaluators: dict[str, Callable] = {}
+        self._checkpoint_handlers: dict[str, Callable] = {}
+        self._results: dict[str, Any] = {}
         self._audit_log: list[dict] = []
 
     def register(self, activity: str, fn: Callable) -> None:
         """Register a callable against an approved_activity string.
 
-        Raises ValueError if the activity string is not in the skill's allowlist,
-        catching misconfiguration at startup rather than at runtime.
+        Raises ValueError if the activity is not in the skill's allowlist —
+        catching misconfiguration at startup.
         """
         if activity not in self._approved:
             raise ValueError(
                 f"Cannot register '{activity}': not in approved_activities "
                 f"for skill '{self._skill_id}'"
             )
-        self._registry[activity] = fn
+        self._activity_registry[activity] = fn
 
-    def run(self, activity: str, **kwargs: Any) -> Any:
-        """Execute the function registered for activity, enforcing the allowlist.
+    def set_step_kwargs(self, step_id: str, kwargs: dict | Callable) -> None:
+        """Provide kwargs for a specific workflow step.
 
-        Raises:
-            ActivityNotPermittedError: if the activity is not approved.
-            KeyError: if the activity is approved but no function has been registered.
+        Pass a plain dict for steps with fixed inputs, or a callable that
+        receives the accumulated results dict and returns a dict — for steps
+        whose inputs depend on earlier step outputs.
         """
-        if activity not in self._approved:
-            raise ActivityNotPermittedError(activity, self._skill_id)
+        self._step_kwargs[step_id] = kwargs
 
-        fn = self._registry[activity]
-        result = fn(**kwargs)
+    def register_veto(self, veto_id: str, fn: Callable) -> None:
+        """Register an evaluator for a hard_veto_trigger.
 
-        self._audit_log.append({
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "skill_id": self._skill_id,
-            "activity": activity,
-            "status": "completed",
-        })
-        return result
+        fn(step_result, all_results) -> bool. Returns True if the veto fires.
+        """
+        self._veto_evaluators[veto_id] = fn
+
+    def register_checkpoint(self, checkpoint_id: str, fn: Callable) -> None:
+        """Register a handler for an oversight checkpoint.
+
+        fn(step_result, all_results, checkpoint_def) -> bool.
+        Returns True to allow progression, False to block.
+        """
+        self._checkpoint_handlers[checkpoint_id] = fn
+
+    def execute(self) -> dict[str, Any]:
+        """Execute all workflow steps in the order defined by the skill YAML.
+
+        Returns the accumulated results dict (step_id → return value).
+        Raises VetoTriggeredError or CheckpointBlockedError on governance failures.
+        """
+        for step in self._steps:
+            step_id = step["id"]
+            activity = step["activity"]
+
+            # Resolve per-step kwargs — callable form allows referencing prior results
+            raw = self._step_kwargs.get(step_id, {})
+            kwargs: dict = raw(self._results) if callable(raw) else raw
+
+            # Execute the registered activity function
+            fn = self._activity_registry[activity]
+            result = fn(**kwargs)
+            self._results[step_id] = result
+
+            self._audit_log.append({
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "skill_id": self._skill_id,
+                "step_id": step_id,
+                "activity": activity,
+                "status": "completed",
+            })
+
+            # Evaluate veto trigger (if defined for this step)
+            if veto_id := step.get("veto_trigger"):
+                veto_def = self._veto_index[veto_id]
+                evaluator = self._veto_evaluators.get(veto_id)
+                if evaluator and evaluator(result, self._results):
+                    raise VetoTriggeredError(
+                        veto_id,
+                        veto_def["action"],
+                        veto_def.get("escalation_contact", ""),
+                    )
+
+            # Evaluate oversight checkpoint (if defined for this step)
+            if cp_id := step.get("checkpoint"):
+                cp_def = self._checkpoint_index[cp_id]
+                handler = self._checkpoint_handlers.get(cp_id)
+                if handler and not handler(result, self._results, cp_def):
+                    raise CheckpointBlockedError(cp_id, cp_def["who_reviews"])
+
+        return self._results
 
     @property
     def audit_log(self) -> list[dict]:
@@ -111,7 +200,6 @@ class ApplicationDocuments:
 
 
 def retrieve_and_parse_documents(application_id: str) -> ApplicationDocuments:
-    """Approved activity: Retrieve and parse submitted application documents (proof of income, ID)"""
     print(f"  [docs] Retrieving documents for application {application_id}...")
     return ApplicationDocuments(
         applicant_name="Jane Smith",
@@ -126,7 +214,6 @@ def retrieve_and_parse_documents(application_id: str) -> ApplicationDocuments:
 
 
 def query_credit_scoring_system(applicant_name: str, date_of_birth: str) -> dict:
-    """Approved activity: Query the internal credit scoring system for the applicant's risk score"""
     print(f"  [credit] Querying credit score for {applicant_name}...")
     return {
         "credit_score": 712,
@@ -138,7 +225,6 @@ def query_credit_scoring_system(applicant_name: str, date_of_birth: str) -> dict
 
 
 def run_sanctions_screening(applicant_name: str, date_of_birth: str, address: str) -> dict:
-    """Approved activity: Cross-reference applicant details against the sanctions screening database"""
     print(f"  [sanctions] Screening {applicant_name} against HM Treasury / OFAC lists...")
     return {
         "match_found": False,
@@ -153,7 +239,6 @@ def calculate_debt_to_income_ratio(
     requested_loan_gbp: float,
     existing_monthly_obligations_gbp: float,
 ) -> dict:
-    """Approved activity: Calculate debt-to-income ratio using declared and verified income figures"""
     print("  [dti] Calculating debt-to-income ratio...")
     monthly_income = verified_income_gbp / 12
     proposed_monthly_repayment = requested_loan_gbp / 60  # assume 5-year term
@@ -176,16 +261,13 @@ def generate_recommendation_report(
     dti_result: dict,
     requested_loan_gbp: float,
 ) -> dict:
-    """Approved activity: Generate a structured recommendation report for the human underwriter"""
     print("  [report] Generating underwriter recommendation report...")
     issues = []
     if not dti_result["dti_within_policy"]:
         issues.append(f"DTI ratio {dti_result['dti_ratio']} exceeds 0.45 policy limit")
     if credit_result["credit_score"] < 580:
         issues.append(f"Credit score {credit_result['credit_score']} below minimum threshold")
-
     recommendation = "APPROVE" if not issues else "REFER"
-
     return {
         "application_id": application_id,
         "applicant": documents.applicant_name,
@@ -203,18 +285,17 @@ def generate_recommendation_report(
 
 
 def send_acknowledgement_email(applicant_name: str, application_id: str, status: str) -> dict:
-    """Approved activity: Send templated acknowledgement and status-update emails to the applicant"""
     print(f"  [email] Sending '{status}' email to {applicant_name}...")
     templates = {
         "received":    "Your application {id} has been received and is under review.",
         "in_progress": "Your application {id} is progressing — we will contact you shortly.",
+        "decision":    "A decision has been reached on your application {id}.",
     }
     body = templates.get(status, "Your application {id} has been updated.").format(id=application_id)
     return {"sent": True, "to": applicant_name, "template": status, "body": body}
 
 
 def log_audit_entry(event: str, application_id: str, detail: str) -> dict:
-    """Approved activity: Log all actions and data accesses to the audit trail"""
     entry = {
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "application_id": application_id,
@@ -226,152 +307,191 @@ def log_audit_entry(event: str, application_id: str, detail: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# A function that is NOT in approved_activities — to demonstrate the block
-# ---------------------------------------------------------------------------
-
-def issue_loan_offer_directly(applicant_name: str, amount_gbp: float) -> None:
-    """NOT an approved activity — the skill explicitly prohibits issuing a loan
-    offer without underwriter approval. Calling this through the guard will raise."""
-    print(f"  Issuing loan offer of £{amount_gbp:,.0f} to {applicant_name}...")
-
-
-# ---------------------------------------------------------------------------
 # Main demo
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    # 1. Load the skill and build an ActivityGuard
+    application_id = "APP-2025-00142"
+    requested_loan_gbp = 18_500.0
+
+    # 1. Load the skill — access control enforced by registry
     registry = SkillRegistry()
     skill = registry.get_skill(
         "retail_banking/loan-application-processing",
         agent_id="loan-processor-agent-prod",
     )
-    guard = ActivityGuard(skill)
+    runner = WorkflowRunner(skill)
 
-    # 2. Register each approved_activity string → Python function
-    #    The string must match exactly what is in the YAML.
-    guard.register(
+    # 2. Register activity implementations
+    #    Each string must match exactly an entry in scope.approved_activities.
+    runner.register(
         "Retrieve and parse submitted application documents (proof of income, ID)",
         retrieve_and_parse_documents,
     )
-    guard.register(
+    runner.register(
         "Query the internal credit scoring system for the applicant's risk score",
         query_credit_scoring_system,
     )
-    guard.register(
+    runner.register(
         "Cross-reference applicant details against the sanctions screening database",
         run_sanctions_screening,
     )
-    guard.register(
+    runner.register(
         "Calculate debt-to-income ratio using declared and verified income figures",
         calculate_debt_to_income_ratio,
     )
-    guard.register(
+    runner.register(
         "Generate a structured recommendation report for the human underwriter",
         generate_recommendation_report,
     )
-    guard.register(
+    runner.register(
         "Send templated acknowledgement and status-update emails to the applicant",
         send_acknowledgement_email,
     )
-    guard.register(
+    runner.register(
         "Log all actions and data accesses to the audit trail",
         log_audit_entry,
     )
 
-    # 3. Run the loan processing workflow via the guard
-    application_id = "APP-2025-00142"
-    requested_loan_gbp = 18_500.0
+    # 3. Provide per-step kwargs.
+    #    Fixed inputs use a plain dict. Steps that depend on earlier outputs
+    #    use a callable that receives the accumulated results dict.
+    runner.set_step_kwargs("retrieve-documents", {"application_id": application_id})
 
-    print(f"\nProcessing application {application_id} (£{requested_loan_gbp:,.0f} loan)\n")
+    runner.set_step_kwargs("log-documents-retrieved", lambda r: {
+        "event": "documents_retrieved",
+        "application_id": application_id,
+        "detail": (
+            f"ID type: {r['retrieve-documents'].id_document_type}, "
+            f"verified sources: {r['retrieve-documents'].id_verified_sources}"
+        ),
+    })
 
-    # Step 1: retrieve documents
-    docs = guard.run(
-        "Retrieve and parse submitted application documents (proof of income, ID)",
-        application_id=application_id,
+    runner.set_step_kwargs("sanctions-screening", lambda r: {
+        "applicant_name": r["retrieve-documents"].applicant_name,
+        "date_of_birth":  r["retrieve-documents"].date_of_birth,
+        "address":        r["retrieve-documents"].address,
+    })
+
+    runner.set_step_kwargs("log-sanctions-complete", lambda r: {
+        "event": "sanctions_screening_complete",
+        "application_id": application_id,
+        "detail": (
+            f"match_found={r['sanctions-screening']['match_found']}, "
+            f"confidence={r['sanctions-screening']['match_confidence']}"
+        ),
+    })
+
+    runner.set_step_kwargs("credit-score", lambda r: {
+        "applicant_name": r["retrieve-documents"].applicant_name,
+        "date_of_birth":  r["retrieve-documents"].date_of_birth,
+    })
+
+    runner.set_step_kwargs("log-credit-retrieved", lambda r: {
+        "event": "credit_score_retrieved",
+        "application_id": application_id,
+        "detail": (
+            f"score={r['credit-score']['credit_score']}, "
+            f"band={r['credit-score']['band']}"
+        ),
+    })
+
+    runner.set_step_kwargs("calculate-dti", lambda r: {
+        "verified_income_gbp":              r["retrieve-documents"].verified_income_gbp,
+        "requested_loan_gbp":               requested_loan_gbp,
+        "existing_monthly_obligations_gbp": 320.0,
+    })
+
+    runner.set_step_kwargs("log-dti-calculated", lambda r: {
+        "event": "dti_calculated",
+        "application_id": application_id,
+        "detail": (
+            f"dti={r['calculate-dti']['dti_ratio']}, "
+            f"within_policy={r['calculate-dti']['dti_within_policy']}"
+        ),
+    })
+
+    runner.set_step_kwargs("send-progress-notification", lambda r: {
+        "applicant_name": r["retrieve-documents"].applicant_name,
+        "application_id": application_id,
+        "status": "in_progress",
+    })
+
+    runner.set_step_kwargs("generate-recommendation", lambda r: {
+        "application_id":   application_id,
+        "documents":        r["retrieve-documents"],
+        "credit_result":    r["credit-score"],
+        "sanctions_result": r["sanctions-screening"],
+        "dti_result":       r["calculate-dti"],
+        "requested_loan_gbp": requested_loan_gbp,
+    })
+
+    runner.set_step_kwargs("log-recommendation-generated", lambda r: {
+        "event": "recommendation_generated",
+        "application_id": application_id,
+        "detail": (
+            f"recommendation={r['generate-recommendation']['recommendation']}, "
+            f"awaiting_approval=True"
+        ),
+    })
+
+    runner.set_step_kwargs("notify-applicant-decision", lambda r: {
+        "applicant_name": r["retrieve-documents"].applicant_name,
+        "application_id": application_id,
+        "status": "decision",
+    })
+
+    # 4. Register veto evaluators.
+    #    Each evaluator receives (step_result, all_results) and returns True to fire.
+    runner.register_veto(
+        "data-quality-critical",
+        lambda result, _: result is None,
     )
-    guard.run(
-        "Log all actions and data accesses to the audit trail",
-        event="documents_retrieved",
-        application_id=application_id,
-        detail=f"ID type: {docs.id_document_type}, verified sources: {docs.id_verified_sources}",
+    runner.register_veto(
+        "sanctions-match",
+        lambda result, _: result["match_found"] or result["exact_match"],
+    )
+    runner.register_veto(
+        "protected-characteristic-detected",
+        lambda result, _: False,  # not surfaced by stub credit bureau
     )
 
-    # Check identity gate (procedural requirement)
-    if docs.id_verified_sources < 2:
-        print("\n  VETO: Identity not verified against two independent sources — halting.")
+    # 5. Register checkpoint handlers.
+    #    Each handler receives (step_result, all_results, checkpoint_def)
+    #    and returns True to allow progression.
+    runner.register_checkpoint(
+        "identity-verified",
+        lambda result, _, cp: result.id_verified_sources >= 2,
+    )
+    runner.register_checkpoint(
+        "creditworthiness-assessment-review",
+        lambda result, _, cp: (
+            # Simulated underwriter approval — in production this would
+            # pause and await a human response via a task queue or UI.
+            print(f"  [checkpoint] {cp['name']} — simulating underwriter approval") or True
+        ),
+    )
+    runner.register_checkpoint(
+        "decision-communication",
+        lambda result, _, cp: (
+            print(f"  [checkpoint] {cp['name']} — notifying applicant") or True
+        ),
+    )
+
+    # 6. Execute — the runner drives the sequence from skill["workflow"]["steps"]
+    print(f"\nProcessing application {application_id} (£{requested_loan_gbp:,.0f} loan)")
+    print(f"Workflow: {len(skill['workflow']['steps'])} steps as defined in skill YAML\n")
+
+    try:
+        results = runner.execute()
+    except VetoTriggeredError as exc:
+        print(f"\n  HARD VETO: {exc}")
+        return
+    except CheckpointBlockedError as exc:
+        print(f"\n  CHECKPOINT BLOCKED: {exc}")
         return
 
-    # Step 2: sanctions screening (must run before credit check per procedural requirements)
-    sanctions = guard.run(
-        "Cross-reference applicant details against the sanctions screening database",
-        applicant_name=docs.applicant_name,
-        date_of_birth=docs.date_of_birth,
-        address=docs.address,
-    )
-    guard.run(
-        "Log all actions and data accesses to the audit trail",
-        event="sanctions_screening_complete",
-        application_id=application_id,
-        detail=f"match_found={sanctions['match_found']}, confidence={sanctions['match_confidence']}",
-    )
-
-    if sanctions["match_found"] or sanctions["exact_match"]:
-        print("\n  HARD VETO: Sanctions match — halting and escalating to Financial Crime team.")
-        return
-
-    # Step 3: credit score
-    credit = guard.run(
-        "Query the internal credit scoring system for the applicant's risk score",
-        applicant_name=docs.applicant_name,
-        date_of_birth=docs.date_of_birth,
-    )
-    guard.run(
-        "Log all actions and data accesses to the audit trail",
-        event="credit_score_retrieved",
-        application_id=application_id,
-        detail=f"score={credit['credit_score']}, band={credit['band']}",
-    )
-
-    # Step 4: DTI calculation
-    dti = guard.run(
-        "Calculate debt-to-income ratio using declared and verified income figures",
-        verified_income_gbp=docs.verified_income_gbp,
-        requested_loan_gbp=requested_loan_gbp,
-        existing_monthly_obligations_gbp=320.0,
-    )
-    guard.run(
-        "Log all actions and data accesses to the audit trail",
-        event="dti_calculated",
-        application_id=application_id,
-        detail=f"dti={dti['dti_ratio']}, within_policy={dti['dti_within_policy']}",
-    )
-
-    # Step 5: acknowledgement email
-    guard.run(
-        "Send templated acknowledgement and status-update emails to the applicant",
-        applicant_name=docs.applicant_name,
-        application_id=application_id,
-        status="in_progress",
-    )
-
-    # Step 6: recommendation report
-    report = guard.run(
-        "Generate a structured recommendation report for the human underwriter",
-        application_id=application_id,
-        documents=docs,
-        credit_result=credit,
-        sanctions_result=sanctions,
-        dti_result=dti,
-        requested_loan_gbp=requested_loan_gbp,
-    )
-    guard.run(
-        "Log all actions and data accesses to the audit trail",
-        event="recommendation_generated",
-        application_id=application_id,
-        detail=f"recommendation={report['recommendation']}, awaiting_approval=True",
-    )
-
+    report = results["generate-recommendation"]
     print(f"\n  Recommendation: {report['recommendation']}")
     print(f"  Credit score:   {report['credit_score']}")
     print(f"  DTI ratio:      {report['dti_ratio']} ({'within policy' if report['dti_within_policy'] else 'exceeds policy'})")
@@ -382,31 +502,20 @@ def main() -> None:
             print(f"  Issue:          {issue}")
     print(f"\n  Report is awaiting underwriter approval — agent workflow complete.")
 
-    # 4. Demonstrate the block: attempting a prohibited action through the guard
-    print("\n--- Attempting a prohibited action ---")
+    # 7. Demonstrate that the allowlist is still enforced at registration
+    print("\n--- Attempting to register a non-approved activity ---")
     try:
-        guard.run(
-            "Issue a loan offer or rejection directly to the applicant without underwriter approval",
-            applicant_name=docs.applicant_name,
-            amount_gbp=requested_loan_gbp,
-        )
-    except ActivityNotPermittedError as exc:
-        print(f"  BLOCKED: {exc}")
-
-    # 5. Demonstrate the block: attempting to register a non-approved function
-    print("\n--- Attempting to register a non-approved function ---")
-    try:
-        guard.register(
+        runner.register(
             "Access the applicant's full transaction history",
             lambda **kw: None,
         )
     except ValueError as exc:
         print(f"  BLOCKED at registration: {exc}")
 
-    # 6. Show audit log
+    # 8. Show audit log — every step recorded, driven by the workflow definition
     print("\n--- Audit log ---")
-    for entry in guard.audit_log:
-        print(f"  {entry['timestamp']}  {entry['activity'][:70]}")
+    for entry in runner.audit_log:
+        print(f"  {entry['timestamp']}  [{entry['step_id']}]  {entry['activity'][:55]}")
 
 
 if __name__ == "__main__":
