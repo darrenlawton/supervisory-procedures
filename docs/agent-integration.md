@@ -76,25 +76,7 @@ registry = SkillRegistry(registry_path="/path/to/your/registry")
 
 ---
 
-## Exporting to Agent Frameworks
-
-### NeMo Guardrails
-
-```python
-from supervisory_procedures.adapters.nemo_guardrails import NeMoGuardrailsAdapter
-
-skill = registry.get_skill("retail_banking/loan-application-processing")
-adapter = NeMoGuardrailsAdapter()
-result = adapter.export(skill)
-
-# Write artefacts to a NeMo config directory
-Path("nemo_config/config.yml").write_text(result["config_yml"])
-Path("nemo_config/skill_rails.co").write_text(result["skill_rails_co"])
-```
-
-Then fill in the `# TODO` sections in `skill_rails.co` with your detection logic.
-
-### Generic JSON
+## Exporting to JSON
 
 ```python
 from supervisory_procedures.adapters.generic_json import GenericJsonAdapter

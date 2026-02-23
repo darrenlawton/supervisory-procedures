@@ -1,17 +1,23 @@
 # Supervisory Procedures — Skill-as-Code Platform
 
-A governance platform for federated AI development. Business supervisors define, version-control, and govern what AI agents are authorised to do within their areas.
+**The people accountable for AI agents rarely control them. This tool changes that.**
+
+AI agents are being deployed into production workflows across financial services, operations, and compliance. The people accountable for those workflows — business supervisors — have no direct way to control what agents are permitted to do.
+
+Supervisory Procedures closes that gap. Business supervisors define **Agent Skills** in structured YAML: an exhaustive list of permitted actions, hard prohibitions, veto conditions that halt execution, and human oversight checkpoints. Skills are version-controlled in Git, reviewed via pull request, and loaded by agent runtimes at execution time.
+
+The engineer builds the agent. The supervisor controls what it is allowed to do.
 
 ## Concept
 
-Large organisations with multiple AI development teams (spokes) need a way for non-technical business supervisors to control agent behaviour without writing code. **Agent Skills** are structured YAML definitions that declare:
+An **Agent Skill** is a structured YAML document that answers four questions about an AI agent:
 
-- What an agent is **approved to do** (an exhaustive allowlist)
-- What it must **never do** (absolute prohibitions)
-- **Hard veto triggers** that immediately halt execution
-- **Oversight checkpoints** where a human must review or approve
+- What is it **approved to do?** — an exhaustive allowlist of permitted actions
+- What must it **never do?** — absolute prohibitions enforced at registration
+- When should it **stop immediately?** — hard veto triggers that halt execution and escalate
+- Where does a **human decide?** — named checkpoints where review or approval is required before the agent continues
 
-Skills are version-controlled in Git, approved via pull request, and consumed by agent runtimes at execution time. The central innovation team (hub) owns the schema and tooling; business areas (spokes) author skills within that framework.
+Skills are version-controlled in Git, approved via pull request, and loaded by agent runtimes at execution time. The organisation's central team owns the schema and tooling; each business area authors skills within that framework — without needing to write or deploy code.
 
 ## Quick Start
 
@@ -30,9 +36,6 @@ supv list --business-area retail_banking
 
 # Show a specific skill
 supv show retail_banking/loan-application-processing
-
-# Export to NeMo Guardrails
-supv export retail_banking/loan-application-processing --format nemo
 ```
 
 ## Project Structure

@@ -59,8 +59,5 @@ dmypy.json
 .AppleDouble
 .LSOverride
 
-# Generated NeMo output (examples only)
-examples/nemo_output/
-
 # Jupyter
 .ipynb_checkpoints/
