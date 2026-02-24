@@ -2,7 +2,7 @@ metadata:
   id: test_area/test-skill
   name: Test Skill
   version: 1.0.0
-  schema_version: "1.0"
+  schema_version: "2.0"
   business_area: test_area
   supervisor:
     name: Test Supervisor
@@ -31,24 +31,21 @@ constraints:
   unacceptable_actions:
     - Write or delete any data
 
-hard_veto_triggers:
+control_points:
   - id: error-threshold-exceeded
+    name: Error Threshold Exceeded
     description: The number of consecutive errors exceeds the allowed threshold.
-    action: halt_and_notify
+    classification: vetoed
+    trigger_condition: Consecutive error count exceeds the configured threshold.
 
-oversight_checkpoints:
-  workflow_checkpoints:
-    - id: initial-review
-      name: Initial Review
-      description: Review the output before proceeding.
-      checkpoint_type: review
-      required: true
-      who_reviews: Test reviewer
-  condition_triggered_checkpoints: []
+  - id: initial-review
+    name: Initial Review
+    description: Review the output before proceeding.
+    classification: review
+    who_reviews: Test reviewer
 
 workflow:
   steps:
     - id: run-query
       activity: "Perform read-only queries against the test database"
-      veto_trigger: error-threshold-exceeded
-      checkpoint: initial-review
+      control_point: initial-review

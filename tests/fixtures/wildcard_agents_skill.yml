@@ -2,7 +2,7 @@ metadata:
   id: test_area/wildcard-skill
   name: Wildcard Agents Skill
   version: 1.0.0
-  schema_version: "1.0"
+  schema_version: "2.0"
   business_area: test_area
   supervisor:
     name: Test Supervisor
@@ -31,17 +31,14 @@ constraints:
   unacceptable_actions:
     - Modify any data
 
-hard_veto_triggers:
+control_points:
   - id: test-veto
-    description: Test veto trigger.
-    action: halt_and_refuse
-
-oversight_checkpoints:
-  workflow_checkpoints: []
-  condition_triggered_checkpoints: []
+    name: Test Veto
+    description: Test veto control point.
+    classification: vetoed
+    trigger_condition: Test condition is triggered.
 
 workflow:
   steps:
     - id: read-data
       activity: "Read-only data access"
-      veto_trigger: test-veto

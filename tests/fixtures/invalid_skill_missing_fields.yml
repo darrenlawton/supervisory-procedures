@@ -8,4 +8,4 @@ context:
   description: This skill is intentionally incomplete.
   # Missing: business_rationale, applicable_regulations, risk_classification
 
-# Missing top-level blocks: scope, constraints, hard_veto_triggers, oversight_checkpoints
+# Missing top-level blocks: scope, constraints, control_points
