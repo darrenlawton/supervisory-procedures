@@ -1,9 +1,0 @@
-[
-  "retrieve_application_documents",
-  "query_credit_score",
-  "run_sanctions_screening",
-  "calculate_debt_to_income",
-  "generate_underwriter_recommendation",
-  "send_applicant_communication",
-  "write_audit_log_entry"
-]

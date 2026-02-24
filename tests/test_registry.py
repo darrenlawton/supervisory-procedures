@@ -8,8 +8,9 @@ import yaml
 from supervisory_procedures.core.access_control import (
     AgentNotAuthorisedError,
     SkillNotApprovedError,
+    SkillNotFoundError,
 )
-from supervisory_procedures.core.registry import SkillNotFoundError, SkillRegistry
+from supervisory_procedures.core.registry import SkillRegistry
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REGISTRY = Path(__file__).parent.parent / "registry"
@@ -22,24 +23,23 @@ class TestSkillRegistryLoad:
         assert len(reg) > 0
 
     def test_loads_from_custom_path(self, tmp_path):
-        # Copy a valid skill to temp dir
-        src = FIXTURES / "valid_skill.yml"
-        dest = tmp_path / "test_area" / "test-skill.yml"
+        # Skills must be directory-based (skill.yml inside a named directory)
+        dest = tmp_path / "test_area" / "test-skill" / "skill.yml"
         dest.parent.mkdir(parents=True)
-        dest.write_text(src.read_text())
+        dest.write_text((FIXTURES / "valid_skill.yml").read_text())
         reg = SkillRegistry(registry_path=tmp_path)
         reg.load()
         assert len(reg) == 1
 
     def test_skips_invalid_skills(self, tmp_path):
-        # Copy valid and invalid fixtures
-        (tmp_path / "test_area").mkdir()
-        (tmp_path / "test_area" / "valid.yml").write_text(
-            (FIXTURES / "valid_skill.yml").read_text()
-        )
-        (tmp_path / "test_area" / "invalid.yml").write_text(
-            (FIXTURES / "invalid_skill_missing_fields.yml").read_text()
-        )
+        valid_dir = tmp_path / "test_area" / "valid-skill"
+        valid_dir.mkdir(parents=True)
+        (valid_dir / "skill.yml").write_text((FIXTURES / "valid_skill.yml").read_text())
+
+        invalid_dir = tmp_path / "test_area" / "invalid-skill"
+        invalid_dir.mkdir(parents=True)
+        (invalid_dir / "skill.yml").write_text((FIXTURES / "invalid_skill_missing_fields.yml").read_text())
+
         reg = SkillRegistry(registry_path=tmp_path)
         reg.load()
         assert len(reg) == 1
@@ -90,12 +90,10 @@ class TestSkillRegistryGetSkill:
             reg.get_skill("nonexistent/skill")
 
     def test_draft_skill_blocked_by_agent_id(self, tmp_path):
-        (tmp_path / "test_area").mkdir()
-        dest = tmp_path / "test_area" / "draft-skill.yml"
-        dest.write_text((FIXTURES / "draft_skill.yml").read_text())
+        skill_dir = tmp_path / "test_area" / "draft-skill"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "skill.yml").write_text((FIXTURES / "draft_skill.yml").read_text())
         reg = SkillRegistry(registry_path=tmp_path)
-        # Draft skills ARE loaded into cache (Layer 3 is about schema validity)
-        # but blocked at access time by agent_id check (Layer 1)
         with pytest.raises(SkillNotApprovedError):
             reg.get_skill("test_area/draft-skill", agent_id="test-agent-dev")
 
@@ -132,11 +130,11 @@ class TestSkillRegistryListSkills:
     def test_list_includes_risk_classification(self):
         reg = SkillRegistry()
         skills = reg.list_skills()
-        # Every summary dict should have risk_classification
         for s in skills:
             assert "risk_classification" in s
 
-    def test_skill_ids_sorted(self):
+    def test_list_results_are_sorted(self):
         reg = SkillRegistry()
-        ids = reg.skill_ids()
+        skills = reg.list_skills()
+        ids = [s["id"] for s in skills]
         assert ids == sorted(ids)

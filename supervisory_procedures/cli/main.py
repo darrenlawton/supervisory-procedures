@@ -22,9 +22,11 @@ from supervisory_procedures.cli.list_skills import list_skills  # noqa: E402
 from supervisory_procedures.cli.show import show  # noqa: E402
 from supervisory_procedures.cli.wizard import new  # noqa: E402
 from supervisory_procedures.cli.export import export  # noqa: E402
+from supervisory_procedures.cli.render import render  # noqa: E402
 
 cli.add_command(validate)
 cli.add_command(list_skills, name="list")
 cli.add_command(show)
 cli.add_command(new)
 cli.add_command(export)
+cli.add_command(render)

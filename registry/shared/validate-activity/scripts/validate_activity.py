@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Activity allowlist enforcer for supervisory skill scope boundaries.
+"""Activity scope enforcer — validates a workflow step against skill.yml.
 
-Reads a JSON allowlist file and checks whether the requested activity is
-permitted. Prints a JSON result to stdout. Exit 0 = permitted, exit 1 = denied.
+Reads the skill.yml file and checks whether the requested step ID is a valid
+workflow step. Prints a JSON result to stdout.
+
+Exit codes:
+  0 — step is permitted (found in workflow.steps)
+  1 — step is not permitted or skill.yml could not be read
 """
 from __future__ import annotations
 
@@ -11,39 +15,36 @@ import json
 import sys
 from pathlib import Path
 
+import yaml
+
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Check activity against approved allowlist")
-    parser.add_argument("--activity", required=True, help="Activity slug to check")
-    parser.add_argument(
-        "--allowlist",
-        required=True,
-        help="Path to JSON file containing array of approved activity slugs",
-    )
+    parser = argparse.ArgumentParser(description="Validate a workflow step against skill.yml")
+    parser.add_argument("--skill", required=True, help="Path to the skill's skill.yml file")
+    parser.add_argument("--step", required=True, help="Workflow step ID to validate")
     args = parser.parse_args()
 
-    allowlist_path = Path(args.allowlist)
+    skill_path = Path(args.skill)
     try:
-        allowlist: list[str] = json.loads(allowlist_path.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        print(
-            json.dumps({
-                "allowed": False,
-                "activity": args.activity,
-                "reason": f"Could not read allowlist: {exc}",
-            }),
-            file=sys.stderr,
-        )
+        skill = yaml.safe_load(skill_path.read_text())
+    except (OSError, yaml.YAMLError) as exc:
+        print(json.dumps({
+            "allowed": False,
+            "step": args.step,
+            "reason": f"Could not read skill.yml: {exc}",
+        }))
         sys.exit(1)
 
-    if args.activity in allowlist:
-        print(json.dumps({"allowed": True, "activity": args.activity}))
+    valid_step_ids = {s["id"] for s in skill.get("workflow", {}).get("steps", [])}
+
+    if args.step in valid_step_ids:
+        print(json.dumps({"allowed": True, "step": args.step}))
         sys.exit(0)
 
     print(json.dumps({
         "allowed": False,
-        "activity": args.activity,
-        "reason": f"'{args.activity}' is not in the approved_activities allowlist",
+        "step": args.step,
+        "reason": f"'{args.step}' is not a valid workflow step in this skill",
     }))
     sys.exit(1)
 

@@ -39,37 +39,30 @@ class AgentNotAuthorisedError(PermissionError):
         )
 
 
-class AuthorisedAgentsGuard:
-    """Enforces the three access-control layers for a single skill."""
+def check_access(skill_data: dict[str, Any], agent_id: str) -> None:
+    """Raise an appropriate error if agent_id is not permitted to use the skill.
 
-    def __init__(self, skill_data: dict[str, Any]) -> None:
-        self._data = skill_data
-        meta = skill_data.get("metadata", {})
-        self._skill_id: str = meta.get("id", "<unknown>")
-        self._status: str = meta.get("status", "draft")
-        self._authorised_agents: list[str] = meta.get("authorised_agents", [])
+    Enforces access-control layers:
+    - Layer 1: skill must be approved
+    - Layer 2: agent_id must be in authorised_agents
+    - Layer 3: schema validity is enforced at registry load time
+    """
+    meta = skill_data.get("metadata", {})
+    skill_id: str = meta.get("id", "<unknown>")
+    status: str = meta.get("status", "draft")
+    authorised_agents: list[str] = meta.get("authorised_agents", [])
 
-    @property
-    def skill_id(self) -> str:
-        return self._skill_id
+    if status != "approved":
+        raise SkillNotApprovedError(skill_id, status)
 
-    def check(self, agent_id: str) -> None:
-        """Raise the appropriate error if the agent is not permitted to use this skill.
+    if _WILDCARD not in authorised_agents and agent_id not in authorised_agents:
+        raise AgentNotAuthorisedError(agent_id, skill_id)
 
-        Call this before handing the skill data to an agent.
-        """
-        # Layer 1 — status gate
-        if self._status != "approved":
-            raise SkillNotApprovedError(self._skill_id, self._status)
 
-        # Layer 2 — allowlist gate
-        if _WILDCARD not in self._authorised_agents and agent_id not in self._authorised_agents:
-            raise AgentNotAuthorisedError(agent_id, self._skill_id)
-
-    def is_permitted(self, agent_id: str) -> bool:
-        """Return True if the agent is permitted; False otherwise (no exception)."""
-        try:
-            self.check(agent_id)
-            return True
-        except PermissionError:
-            return False
+def is_permitted(skill_data: dict[str, Any], agent_id: str) -> bool:
+    """Return True if the agent is permitted; False otherwise (no exception)."""
+    try:
+        check_access(skill_data, agent_id)
+        return True
+    except PermissionError:
+        return False

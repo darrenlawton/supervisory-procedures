@@ -7,7 +7,6 @@ import sys
 import click
 import yaml
 from rich.console import Console
-from rich.syntax import Syntax
 from rich.panel import Panel
 from rich.text import Text
 
@@ -53,17 +52,28 @@ def show(skill_id: str, registry: str | None, raw: bool) -> None:
     _render_skill(skill_data)
 
 
+_CLASSIFICATION_COLOUR = {
+    "vetoed": "bold red",
+    "needs_approval": "red",
+    "review": "yellow",
+    "notify": "cyan",
+    "auto": "green",
+}
+
+_RISK_COLOUR = {"low": "green", "medium": "yellow", "high": "red", "critical": "bold red"}
+_STATUS_COLOUR = {"approved": "green", "draft": "yellow", "deprecated": "dim"}
+
+
 def _render_skill(data: dict) -> None:
     meta = data.get("metadata", {})
     ctx = data.get("context", {})
     scope = data.get("scope", {})
     constraints = data.get("constraints", {})
-    veto_triggers = data.get("hard_veto_triggers", [])
-    checkpoints = data.get("oversight_checkpoints", {})
+    control_points = data.get("control_points", [])
+    workflow_steps = data.get("workflow", {}).get("steps", [])
 
     status = meta.get("status", "")
-    status_colours = {"approved": "green", "draft": "yellow", "deprecated": "dim"}
-    status_colour = status_colours.get(status, "white")
+    status_colour = _STATUS_COLOUR.get(status, "white")
 
     # Header
     console.print()
@@ -92,8 +102,8 @@ def _render_skill(data: dict) -> None:
     console.print()
     console.rule("[bold]Context[/bold]")
     risk = ctx.get("risk_classification", "")
-    risk_colours = {"low": "green", "medium": "yellow", "high": "red", "critical": "bold red"}
-    console.print(f"[bold]Risk:[/bold] [{risk_colours.get(risk, 'white')}]{risk}[/{risk_colours.get(risk, 'white')}]")
+    risk_colour = _RISK_COLOUR.get(risk, "white")
+    console.print(f"[bold]Risk:[/bold] [{risk_colour}]{risk}[/{risk_colour}]")
     console.print(f"[bold]Description:[/bold] {ctx.get('description', '').strip()}")
     console.print(f"[bold]Rationale:[/bold] {ctx.get('business_rationale', '').strip()}")
     regs = ctx.get("applicable_regulations", [])
@@ -118,40 +128,33 @@ def _render_skill(data: dict) -> None:
     for action in constraints.get("unacceptable_actions", []):
         console.print(f"  [red]✗[/red] {action}")
 
-    # Hard veto triggers
-    console.print()
-    console.rule("[bold]Hard Veto Triggers[/bold]")
-    for veto in veto_triggers:
-        action = veto.get("action", "")
-        console.print(f"  [bold red]{veto.get('id', '')}[/bold red] [{action}]")
-        console.print(f"    {veto.get('description', '').strip()}")
-        if veto.get("escalation_contact"):
-            console.print(f"    Escalate to: {veto['escalation_contact']}")
-
-    # Oversight checkpoints
-    wf = checkpoints.get("workflow_checkpoints", [])
-    ct = checkpoints.get("condition_triggered_checkpoints", [])
-    if wf or ct:
+    # Control points
+    if control_points:
         console.print()
-        console.rule("[bold]Oversight Checkpoints[/bold]")
-        if wf:
-            console.print("[bold]Workflow checkpoints:[/bold]")
-            for cp in wf:
-                req_str = "[required]" if cp.get("required") else "[optional]"
-                sla = f"  SLA: {cp['sla_hours']}h" if cp.get("sla_hours") else ""
-                console.print(
-                    f"  [cyan]{cp.get('id', '')}[/cyan] — {cp.get('name', '')} "
-                    f"({cp.get('checkpoint_type', '')}) {req_str}{sla}"
-                )
-                console.print(f"    Reviews: {cp.get('who_reviews', '')}")
-        if ct:
-            console.print("[bold]Condition-triggered checkpoints:[/bold]")
-            for cp in ct:
-                sla = f"  SLA: {cp['sla_hours']}h" if cp.get("sla_hours") else ""
-                console.print(
-                    f"  [cyan]{cp.get('id', '')}[/cyan] — {cp.get('name', '')} "
-                    f"({cp.get('checkpoint_type', '')}){sla}"
-                )
-                console.print(f"    Trigger: {cp.get('trigger_condition', '').strip()}")
+        console.rule("[bold]Control Points[/bold]")
+        for cp in control_points:
+            classification = cp.get("classification", "")
+            colour = _CLASSIFICATION_COLOUR.get(classification, "white")
+            sla = f"  SLA: {cp['sla_hours']}h" if cp.get("sla_hours") else ""
+            console.print(
+                f"  [bold {colour}]{cp.get('id', '')}[/bold {colour}]"
+                f"  [{colour}][{classification}][/{colour}]{sla}"
+            )
+            console.print(f"    {cp.get('description', '').strip()}")
+            if cp.get("trigger_condition"):
+                console.print(f"    Trigger: {cp['trigger_condition']}")
+            if cp.get("who_reviews"):
+                console.print(f"    Reviews: {cp['who_reviews']}")
+            if cp.get("escalation_contact"):
+                console.print(f"    Escalate to: {cp['escalation_contact']}")
+
+    # Workflow
+    if workflow_steps:
+        console.print()
+        console.rule("[bold]Workflow[/bold]")
+        for i, step in enumerate(workflow_steps, 1):
+            cp_ref = f"  → {step['control_point']}" if step.get("control_point") else ""
+            console.print(f"  [dim]{i:2}.[/dim] [cyan]{step.get('id', '')}[/cyan]{cp_ref}")
+            console.print(f"       {step.get('activity', '')}")
 
     console.print()

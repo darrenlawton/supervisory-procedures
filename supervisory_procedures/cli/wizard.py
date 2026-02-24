@@ -21,8 +21,7 @@ err_console = Console(stderr=True)
 _DEFAULT_REGISTRY = Path(__file__).parent.parent.parent / "registry"
 
 _RISK_LEVELS = ["low", "medium", "high", "critical"]
-_VETO_ACTIONS = ["halt_and_escalate", "halt_and_notify", "halt_and_refuse"]
-_CHECKPOINT_TYPES = ["review", "approve", "notify", "halt"]
+_CLASSIFICATIONS = ["auto", "notify", "review", "needs_approval", "vetoed"]
 
 
 # ---------------------------------------------------------------------------
@@ -38,15 +37,32 @@ def _slug(text: str) -> str:
     return text
 
 
+def _q(fn: Any, *args: Any, **kwargs: Any) -> Any:
+    """Call a questionary function; exit cleanly on Ctrl-C (None result)."""
+    val = fn(*args, **kwargs).ask()
+    if val is None:
+        sys.exit(0)
+    return val
+
+
+def _ask(question: str, **kwargs: Any) -> str:
+    return _q(questionary.text, question, **kwargs).strip()
+
+
+def _ask_select(question: str, choices: list[str]) -> str:
+    return _q(questionary.select, question, choices=choices)
+
+
+def _ask_confirm(question: str, default: bool = False) -> bool:
+    return _q(questionary.confirm, question, default=default)
+
+
 def _collect_list(prompt: str, min_items: int = 1) -> list[str]:
-    """Prompt the user to enter items one at a time until they enter an empty line."""
+    """Prompt the user to enter items one at a time until they enter a blank line."""
     items: list[str] = []
     console.print(f"[bold]{prompt}[/bold] (enter each item, blank line when done)")
     while True:
-        val = questionary.text("  →").ask()
-        if val is None:
-            sys.exit(0)  # Ctrl-C
-        val = val.strip()
+        val = _q(questionary.text, "  →").strip()
         if not val:
             if len(items) < min_items:
                 console.print(f"  [yellow]Please enter at least {min_items} item(s).[/yellow]")
@@ -56,34 +72,13 @@ def _collect_list(prompt: str, min_items: int = 1) -> list[str]:
     return items
 
 
-def _ask(question: str, **kwargs: Any) -> str:
-    val = questionary.text(question, **kwargs).ask()
-    if val is None:
-        sys.exit(0)
-    return val.strip()
-
-
-def _ask_select(question: str, choices: list[str]) -> str:
-    val = questionary.select(question, choices=choices).ask()
-    if val is None:
-        sys.exit(0)
-    return val
-
-
-def _ask_confirm(question: str, default: bool = False) -> bool:
-    val = questionary.confirm(question, default=default).ask()
-    if val is None:
-        sys.exit(0)
-    return val
-
-
 # ---------------------------------------------------------------------------
 # Wizard steps
 # ---------------------------------------------------------------------------
 
 def _step_business_area(registry_path: Path) -> str:
-    """Step 1 — select or create a business area."""
-    console.rule("[bold cyan]Step 1 / 10 — Business Area[/bold cyan]")
+    """Step 1 / 9 — select or create a business area."""
+    console.rule("[bold cyan]Step 1 / 9 — Business Area[/bold cyan]")
     existing = sorted(
         d.name for d in registry_path.iterdir() if d.is_dir() and not d.name.startswith(".")
     ) if registry_path.exists() else []
@@ -100,22 +95,21 @@ def _step_business_area(registry_path: Path) -> str:
 
 
 def _step_name_version(business_area: str) -> tuple[str, str, str, str]:
-    """Step 2 — skill name, version, id."""
-    console.rule("[bold cyan]Step 2 / 10 — Skill Name & Version[/bold cyan]")
+    """Step 2 / 9 — skill name, version, id."""
+    console.rule("[bold cyan]Step 2 / 9 — Skill Name & Version[/bold cyan]")
     name = _ask("Skill name (display name):")
     version = _ask("Version:", default="1.0.0")
     suggested_id = f"{business_area}/{_slug(name)}"
     console.print(f"  → Suggested ID: [cyan]{suggested_id}[/cyan]")
     if not _ask_confirm("Use this ID?", default=True):
-        custom_id = _ask("Enter custom ID (format: business_area/kebab-name):")
-        suggested_id = custom_id
+        suggested_id = _ask("Enter custom ID (format: business_area/kebab-name):")
     slug_name = suggested_id.split("/", 1)[-1] if "/" in suggested_id else _slug(name)
     return name, version, suggested_id, slug_name
 
 
 def _step_supervisor() -> dict[str, str]:
-    """Step 3 — supervisor details."""
-    console.rule("[bold cyan]Step 3 / 10 — Supervisor Details[/bold cyan]")
+    """Step 3 / 9 — supervisor details."""
+    console.rule("[bold cyan]Step 3 / 9 — Supervisor Details[/bold cyan]")
     return {
         "name": _ask("Supervisor full name:"),
         "email": _ask("Supervisor email:"),
@@ -124,22 +118,11 @@ def _step_supervisor() -> dict[str, str]:
 
 
 def _step_context() -> dict[str, Any]:
-    """Step 4 — context block."""
-    console.rule("[bold cyan]Step 4 / 10 — Context[/bold cyan]")
+    """Step 4 / 9 — context block."""
+    console.rule("[bold cyan]Step 4 / 9 — Context[/bold cyan]")
     description = _ask("Description (what business activity does this skill govern?):")
     rationale = _ask("Business rationale (why is AI appropriate here?):")
-
-    regulations: list[str] = []
-    console.print("Applicable regulations (e.g. FCA CONC 5.2) — blank line when done:")
-    while True:
-        reg = questionary.text("  →").ask()
-        if reg is None:
-            sys.exit(0)
-        reg = reg.strip()
-        if not reg:
-            break
-        regulations.append(reg)
-
+    regulations = _collect_list("Applicable regulations (e.g. FCA CONC 5.2):", min_items=0)
     risk = _ask_select("Risk classification:", _RISK_LEVELS)
     return {
         "description": description,
@@ -150,15 +133,15 @@ def _step_context() -> dict[str, Any]:
 
 
 def _step_scope() -> dict[str, Any]:
-    """Step 5 — approved activities."""
-    console.rule("[bold cyan]Step 5 / 10 — Scope (Approved Activities)[/bold cyan]")
+    """Step 5 / 9 — approved activities."""
+    console.rule("[bold cyan]Step 5 / 9 — Scope (Approved Activities)[/bold cyan]")
     activities = _collect_list("Approved activities — what the agent MAY do:", min_items=1)
     return {"approved_activities": activities}
 
 
 def _step_constraints() -> dict[str, Any]:
-    """Step 6 — procedural requirements and unacceptable actions."""
-    console.rule("[bold cyan]Step 6 / 10 — Constraints[/bold cyan]")
+    """Step 6 / 9 — procedural requirements and unacceptable actions."""
+    console.rule("[bold cyan]Step 6 / 9 — Constraints[/bold cyan]")
     requirements = _collect_list("Procedural requirements — steps the agent MUST follow:", min_items=1)
     unacceptable = _collect_list("Unacceptable actions — what the agent must NEVER do:", min_items=1)
     return {
@@ -167,114 +150,84 @@ def _step_constraints() -> dict[str, Any]:
     }
 
 
-def _step_veto_triggers() -> list[dict[str, Any]]:
-    """Step 7 — hard veto triggers."""
-    console.rule("[bold cyan]Step 7 / 10 — Hard Veto Triggers[/bold cyan]")
-    console.print("Add at least one hard veto trigger — conditions that immediately halt the agent.")
-    triggers: list[dict[str, Any]] = []
+def _step_control_points() -> list[dict[str, Any]]:
+    """Step 7 / 9 — control points (unified veto + oversight model)."""
+    console.rule("[bold cyan]Step 7 / 9 — Control Points[/bold cyan]")
+    console.print(
+        "Define control points — moments where the agent must pause, notify, or halt.\n"
+        "Classifications: [bold]vetoed[/bold] = halt unconditionally, "
+        "[bold]needs_approval[/bold] = explicit sign-off required, "
+        "[bold]review[/bold] = human reviews before proceeding, "
+        "[bold]notify[/bold] = human informed but not blocked, "
+        "[bold]auto[/bold] = agent proceeds without human involvement."
+    )
+    control_points: list[dict[str, Any]] = []
 
     while True:
-        console.print(f"\n  [bold]Veto trigger #{len(triggers) + 1}[/bold]")
-        veto_id = _ask("  ID (slug, e.g. sanctions-hit):")
-        description = _ask("  Description (plain English condition):")
-        condition_hint = _ask("  Condition hint for developers (optional — press Enter to skip):")
-        action = _ask_select("  Action:", _VETO_ACTIONS)
-        escalation = _ask("  Escalation contact (optional — press Enter to skip):")
-
-        trigger: dict[str, Any] = {
-            "id": _slug(veto_id) if veto_id else f"veto-{len(triggers) + 1}",
-            "description": description,
-            "action": action,
-        }
-        if condition_hint:
-            trigger["condition_hint"] = condition_hint
-        if escalation:
-            trigger["escalation_contact"] = escalation
-
-        triggers.append(trigger)
-
-        if not _ask_confirm("\nAdd another veto trigger?", default=False):
-            break
-
-    return triggers
-
-
-def _step_workflow_checkpoints() -> list[dict[str, Any]]:
-    """Step 8 — workflow checkpoints."""
-    console.rule("[bold cyan]Step 8 / 10 — Workflow Checkpoints[/bold cyan]")
-    console.print("Define named stages in the normal workflow that require oversight.")
-    checkpoints: list[dict[str, Any]] = []
-
-    if not _ask_confirm("Add workflow checkpoints?", default=True):
-        return checkpoints
-
-    while True:
-        console.print(f"\n  [bold]Workflow checkpoint #{len(checkpoints) + 1}[/bold]")
-        cp_id = _ask("  ID (slug):")
+        console.print(f"\n  [bold]Control point #{len(control_points) + 1}[/bold]")
+        cp_id = _slug(_ask("  ID (slug, e.g. sanctions-match):"))
         cp_name = _ask("  Name:")
         cp_desc = _ask("  Description:")
-        cp_type = _ask_select("  Checkpoint type:", _CHECKPOINT_TYPES)
-        required = _ask_confirm("  Required?", default=True)
-        who = _ask("  Who reviews/approves?:")
-        sla_str = _ask("  SLA in hours (optional — press Enter to skip):")
-        sla = int(sla_str) if sla_str.isdigit() else None
+        classification = _ask_select("  Classification:", _CLASSIFICATIONS)
+        trigger = _ask("  Trigger condition — plain English (optional, press Enter to skip):")
+        condition_hint = _ask("  Condition hint for developers (optional, press Enter to skip):")
+        who = _ask("  Who reviews/approves? (optional, press Enter to skip):")
+        escalation = _ask("  Escalation contact (optional, press Enter to skip):")
+        sla_str = _ask("  SLA in hours (optional, press Enter to skip):")
 
         cp: dict[str, Any] = {
-            "id": _slug(cp_id) if cp_id else f"checkpoint-{len(checkpoints) + 1}",
+            "id": cp_id or f"cp-{len(control_points) + 1}",
             "name": cp_name,
             "description": cp_desc,
-            "checkpoint_type": cp_type,
-            "required": required,
-            "who_reviews": who,
+            "classification": classification,
         }
-        if sla:
-            cp["sla_hours"] = sla
+        if trigger:
+            cp["trigger_condition"] = trigger
+        if condition_hint:
+            cp["condition_hint"] = condition_hint
+        if who:
+            cp["who_reviews"] = who
+        if escalation:
+            cp["escalation_contact"] = escalation
+        if sla_str.isdigit():
+            cp["sla_hours"] = int(sla_str)
 
-        checkpoints.append(cp)
+        control_points.append(cp)
 
-        if not _ask_confirm("\nAdd another workflow checkpoint?", default=False):
+        if not _ask_confirm("\nAdd another control point?", default=False):
             break
 
-    return checkpoints
+    return control_points
 
 
-def _step_condition_checkpoints() -> list[dict[str, Any]]:
-    """Step 9 — condition-triggered checkpoints."""
-    console.rule("[bold cyan]Step 9 / 10 — Condition-Triggered Checkpoints[/bold cyan]")
-    console.print("Define checkpoints triggered by deviations or anomalies.")
-    checkpoints: list[dict[str, Any]] = []
-
-    if not _ask_confirm("Add condition-triggered checkpoints?", default=False):
-        return checkpoints
+def _step_workflow(approved_activities: list[str]) -> dict[str, Any]:
+    """Step 8 / 9 — workflow steps."""
+    console.rule("[bold cyan]Step 8 / 9 — Workflow Steps[/bold cyan]")
+    console.print(
+        "Define the ordered steps the agent will execute.\n"
+        "Each step's activity must exactly match an approved activity from Step 5."
+    )
+    steps: list[dict[str, Any]] = []
 
     while True:
-        console.print(f"\n  [bold]Condition checkpoint #{len(checkpoints) + 1}[/bold]")
-        cp_id = _ask("  ID (slug):")
-        cp_name = _ask("  Name:")
-        trigger = _ask("  Trigger condition (plain English):")
-        cp_desc = _ask("  Description (what happens at this checkpoint):")
-        cp_type = _ask_select("  Checkpoint type:", _CHECKPOINT_TYPES)
-        who = _ask("  Who reviews/approves?:")
-        sla_str = _ask("  SLA in hours (optional — press Enter to skip):")
-        sla = int(sla_str) if sla_str.isdigit() else None
+        console.print(f"\n  [bold]Step #{len(steps) + 1}[/bold]")
+        step_id = _slug(_ask("  ID (slug, e.g. check-identity):"))
+        activity = _ask_select("  Activity:", approved_activities)
+        cp_ref = _ask("  Control point ID to attach (optional, press Enter to skip):")
 
-        cp: dict[str, Any] = {
-            "id": _slug(cp_id) if cp_id else f"cond-checkpoint-{len(checkpoints) + 1}",
-            "name": cp_name,
-            "trigger_condition": trigger,
-            "description": cp_desc,
-            "checkpoint_type": cp_type,
-            "who_reviews": who,
+        step: dict[str, Any] = {
+            "id": step_id or f"step-{len(steps) + 1}",
+            "activity": activity,
         }
-        if sla:
-            cp["sla_hours"] = sla
+        if cp_ref:
+            step["control_point"] = cp_ref
 
-        checkpoints.append(cp)
+        steps.append(step)
 
-        if not _ask_confirm("\nAdd another condition-triggered checkpoint?", default=False):
+        if not _ask_confirm("\nAdd another workflow step?", default=True):
             break
 
-    return checkpoints
+    return {"steps": steps}
 
 
 def _step_agents_and_save(
@@ -283,8 +236,8 @@ def _step_agents_and_save(
     skill_slug: str,
     business_area: str,
 ) -> None:
-    """Step 10 — authorised agents, YAML preview, save."""
-    console.rule("[bold cyan]Step 10 / 10 — Authorised Agents & Save[/bold cyan]")
+    """Step 9 / 9 — authorised agents, YAML preview, save."""
+    console.rule("[bold cyan]Step 9 / 9 — Authorised Agents & Save[/bold cyan]")
     console.print(
         "Enter the agent IDs authorised to load this skill.\n"
         "Use format [cyan]<function>-agent-<environment>[/cyan], e.g. loan-processor-agent-prod\n"
@@ -292,7 +245,7 @@ def _step_agents_and_save(
     )
     agents = _collect_list("Authorised agent IDs:", min_items=1)
     if "*" in agents:
-        console.print("[yellow]⚠  Warning: wildcard '*' permits all agents. Consider restricting.[/yellow]")
+        console.print("[yellow]Warning: wildcard '*' permits all agents. Consider restricting.[/yellow]")
 
     skill_data["metadata"]["authorised_agents"] = agents
 
@@ -305,10 +258,10 @@ def _step_agents_and_save(
         console.print("[yellow]Skill not saved.[/yellow]")
         return
 
-    # Determine output path
-    business_dir = registry_path / business_area
-    business_dir.mkdir(parents=True, exist_ok=True)
-    out_path = business_dir / f"{skill_slug}.yml"
+    # Determine output path (directory-based: business_area/skill-name/skill.yml)
+    skill_dir = registry_path / business_area / skill_slug
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    out_path = skill_dir / "skill.yml"
 
     if out_path.exists():
         if not _ask_confirm(f"File {out_path} already exists. Overwrite?", default=False):
@@ -334,7 +287,7 @@ def _step_agents_and_save(
     console.print()
     console.print(Panel(
         f"[bold]Next steps:[/bold]\n\n"
-        f"  git add {out_path}\n"
+        f"  git add {skill_dir}\n"
         f"  git commit -m 'feat: add {skill_data['metadata']['id']} skill'\n"
         f"  git push origin <your-branch>\n"
         f"  # Then open a pull request for review",
@@ -357,7 +310,7 @@ def _step_agents_and_save(
 def new(registry: str | None) -> None:
     """Launch the guided wizard to create a new Agent Skill YAML.
 
-    Walks through 10 steps covering all required schema fields and writes
+    Walks through 9 steps covering all required schema fields and writes
     a validated YAML file to the registry.
     """
     registry_path = Path(registry) if registry else _DEFAULT_REGISTRY
@@ -371,41 +324,22 @@ def new(registry: str | None) -> None:
     ))
     console.print()
 
-    # Step 1
     business_area = _step_business_area(registry_path)
-
-    # Step 2
     name, version, skill_id, skill_slug = _step_name_version(business_area)
-
-    # Step 3
     supervisor = _step_supervisor()
-
-    # Step 4
     context = _step_context()
-
-    # Step 5
     scope = _step_scope()
-
-    # Step 6
     constraints = _step_constraints()
+    control_points = _step_control_points()
+    workflow = _step_workflow(scope["approved_activities"])
 
-    # Step 7
-    veto_triggers = _step_veto_triggers()
-
-    # Step 8
-    workflow_checkpoints = _step_workflow_checkpoints()
-
-    # Step 9
-    condition_checkpoints = _step_condition_checkpoints()
-
-    # Assemble skill dict
     today = date.today().isoformat()
     skill_data: dict[str, Any] = {
         "metadata": {
             "id": skill_id,
             "name": name,
             "version": version,
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "business_area": business_area,
             "supervisor": supervisor,
             "status": "draft",
@@ -416,12 +350,8 @@ def new(registry: str | None) -> None:
         "context": context,
         "scope": scope,
         "constraints": constraints,
-        "hard_veto_triggers": veto_triggers,
-        "oversight_checkpoints": {
-            "workflow_checkpoints": workflow_checkpoints,
-            "condition_triggered_checkpoints": condition_checkpoints,
-        },
+        "control_points": control_points,
+        "workflow": workflow,
     }
 
-    # Step 10
     _step_agents_and_save(skill_data, registry_path, skill_slug, business_area)

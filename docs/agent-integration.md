@@ -16,24 +16,34 @@ pip install supervisory-procedures
 ## Basic Usage
 
 ```python
+from pathlib import Path
 from supervisory_procedures.core.registry import SkillRegistry
+from supervisory_procedures.core.access_control import (
+    AgentNotAuthorisedError,
+    SkillNotApprovedError,
+    SkillNotFoundError,
+)
 
 # Load the registry (scans and validates all skills on first call)
 registry = SkillRegistry()
 
 # Fetch a skill — enforces all three access-control layers
-skill = registry.get_skill(
-    "retail_banking/loan-application-processing",
-    agent_id="loan-processor-agent-prod",
-)
+try:
+    skill = registry.get_skill(
+        "retail_banking/loan-application-processing",
+        agent_id="loan-processor-agent-prod",
+    )
+except SkillNotFoundError:
+    ...  # skill does not exist or failed schema validation
+except SkillNotApprovedError as exc:
+    ...  # skill.status is 'draft' or 'deprecated'
+except AgentNotAuthorisedError:
+    ...  # agent_id not in authorised_agents
 
-# skill is a plain dict — use it to configure your agent
-approved_activities = skill["scope"]["approved_activities"]
-veto_triggers = skill["hard_veto_triggers"]
+# Read the generated SKILL.md as the agent's system prompt
+skill_md = Path(skill["_skill_dir"]) / "SKILL.md"
+instructions = skill_md.read_text()
 ```
-
-If the agent is not authorised, `PermissionError` is raised (specifically
-`AgentNotAuthorisedError` or `SkillNotApprovedError`). Handle these to fail safely.
 
 ---
 
@@ -45,23 +55,58 @@ Every call to `get_skill(skill_id, agent_id=...)` enforces:
 |---|---|---|
 | 1 | Skill `status` must be `approved` | `SkillNotApprovedError` |
 | 2 | `agent_id` must be in `authorised_agents` | `AgentNotAuthorisedError` |
-| 3 | Skill must pass schema validation | Excluded from registry at load time |
+| 3 | Skill must pass schema validation | Excluded from registry at load time — raises `SkillNotFoundError` |
 
-Layer 3 means invalid skills are silently excluded from the cache and raise
-`SkillNotFoundError` rather than a schema error — the skill effectively doesn't exist
-from the agent's perspective.
+Layer 3 means invalid skills are silently excluded from the cache at load time. From the agent's perspective, they do not exist.
+
+---
+
+## Reading the Agent Instructions (SKILL.md)
+
+`skill["_skill_dir"]` is the path to the skill's directory. `SKILL.md` inside that directory is the [Claude Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) compatible instruction document generated from `skill.yml`.
+
+It contains the supervisor's approved activities, ordered workflow, control points, and unacceptable actions, formatted as concrete agent instructions with embedded bash commands for all runtime enforcement scripts.
+
+Pass it as the agent's system prompt:
+
+```python
+from pathlib import Path
+import anthropic
+
+skill_dir = Path(skill["_skill_dir"])
+instructions = (skill_dir / "SKILL.md").read_text()
+
+client = anthropic.Anthropic()
+response = client.messages.create(
+    model="claude-opus-4-6",
+    max_tokens=4096,
+    system=instructions,
+    messages=[{"role": "user", "content": task}],
+)
+```
+
+See `examples/load_skill_in_agent.py` for a complete working example.
 
 ---
 
 ## Checking Permissions Without Fetching
 
-```python
-from supervisory_procedures.core.access_control import AuthorisedAgentsGuard
+Use `is_permitted()` to check access without raising an exception:
 
-guard = AuthorisedAgentsGuard(skill_data)
-if guard.is_permitted("my-agent-prod"):
+```python
+from supervisory_procedures.core.access_control import is_permitted
+
+if is_permitted(skill_data, "my-agent-prod"):
     # safe to proceed
     ...
+```
+
+Or use `check_access()` to raise on failure:
+
+```python
+from supervisory_procedures.core.access_control import check_access
+
+check_access(skill_data, "my-agent-prod")  # raises PermissionError if not permitted
 ```
 
 ---
@@ -79,10 +124,23 @@ registry = SkillRegistry(registry_path="/path/to/your/registry")
 ## Exporting to JSON
 
 ```python
-from supervisory_procedures.adapters.generic_json import GenericJsonAdapter
+import json
 
-json_str = GenericJsonAdapter().export(skill)
-# Pass json_str to any framework that can consume JSON
+skill = registry.get_skill("retail_banking/loan-application-processing")
+skill_id = skill.get("metadata", {}).get("id", "unknown")
+
+envelope = {
+    "export_format": "supervisory-skill-v1",
+    "skill_id": skill_id,
+    "skill": skill,
+}
+json_str = json.dumps(envelope, indent=2, ensure_ascii=False, default=str)
+```
+
+Or via the CLI:
+
+```bash
+supv export retail_banking/loan-application-processing
 ```
 
 ---
@@ -93,21 +151,25 @@ json_str = GenericJsonAdapter().export(skill)
 # All skills
 skills = registry.list_skills()
 
-# Filter by area
+# Filter by business area
 retail_skills = registry.list_skills(business_area="retail_banking")
 
 # Filter by status
 approved = registry.list_skills(status="approved")
+
+# Each result is a metadata dict with risk_classification merged in
+for s in skills:
+    print(s["id"], s["status"], s["risk_classification"])
 ```
 
 ---
 
 ## Error Reference
 
-| Exception | When raised |
-|---|---|
-| `SkillNotFoundError` | Skill ID not in registry (not found or invalid schema) |
-| `SkillNotApprovedError` | Skill is `draft` or `deprecated` |
-| `AgentNotAuthorisedError` | `agent_id` not in `authorised_agents` |
+| Exception | When raised | Inherits from |
+|---|---|---|
+| `SkillNotFoundError` | Skill ID not in registry (not found or invalid schema) | `Exception` |
+| `SkillNotApprovedError` | Skill is `draft` or `deprecated` | `PermissionError` |
+| `AgentNotAuthorisedError` | `agent_id` not in `authorised_agents` | `PermissionError` |
 
-All three inherit from `Exception` (`SkillNotApprovedError` and `AgentNotAuthorisedError` also inherit from `PermissionError`).
+All three are importable from `supervisory_procedures.core.access_control`.

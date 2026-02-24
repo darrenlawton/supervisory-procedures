@@ -8,9 +8,9 @@ from typing import Any
 
 from .access_control import (
     AgentNotAuthorisedError,
-    AuthorisedAgentsGuard,
     SkillNotApprovedError,
     SkillNotFoundError,
+    check_access,
 )
 from .validator import ValidationError, load_yaml, validate_skill
 
@@ -46,39 +46,28 @@ class SkillRegistry:
     def load(self, force_reload: bool = False) -> None:
         """Scan the registry directory and populate the cache.
 
-        Loading is done in two passes so that directory-based skills
-        (skill.yml inside a named directory) take precedence over flat
-        legacy .yml files when both define the same skill ID.
-
-        Invalid skill files are skipped with a warning; they do not prevent
-        other skills from loading.
+        Only directory-based skills (skill.yml inside a named directory) are
+        loaded. Invalid skill files are skipped with a warning; they do not
+        prevent other skills from loading.
         """
         if self._loaded and not force_reload:
             return
 
         self._cache.clear()
 
-        # Pass 1: flat legacy skills (any *.yml not named skill.yml)
-        for path in sorted(self._registry_path.rglob("*.yml")):
-            if path.name == "skill.yml":
-                continue
-            self._load_skill_file(path, skill_dir=None)
-
-        # Pass 2: directory-based skills (skill.yml files) — wins on duplicate ID
         for path in sorted(self._registry_path.rglob("skill.yml")):
-            self._load_skill_file(path, skill_dir=path.parent)
+            self._load_skill_file(path)
 
         self._loaded = True
         logger.info("Registry loaded: %d valid skills", len(self._cache))
 
-    def _load_skill_file(self, path: Path, skill_dir: Path | None) -> None:
+    def _load_skill_file(self, path: Path) -> None:
         """Validate and load a single skill file into the cache."""
         try:
             validate_skill(path)
             data = load_yaml(path)
             skill_id: str = data["metadata"]["id"]
-            if skill_dir is not None:
-                data["_skill_dir"] = str(skill_dir)
+            data["_skill_dir"] = str(path.parent)
             self._cache[skill_id] = data
             logger.debug("Loaded skill %s from %s", skill_id, path)
         except ValidationError as exc:
@@ -113,8 +102,7 @@ class SkillRegistry:
         skill_data = self._cache[skill_id]
 
         if agent_id is not None:
-            guard = AuthorisedAgentsGuard(skill_data)
-            guard.check(agent_id)
+            check_access(skill_data, agent_id)
 
         return skill_data
 
@@ -150,11 +138,6 @@ class SkillRegistry:
 
         return sorted(results, key=lambda m: m.get("id", ""))
 
-    def skill_ids(self) -> list[str]:
-        """Return sorted list of all skill IDs in the registry."""
-        self.load()
-        return sorted(self._cache.keys())
-
     def __len__(self) -> int:
         self.load()
         return len(self._cache)
@@ -164,9 +147,4 @@ class SkillRegistry:
         return skill_id in self._cache
 
 
-__all__ = [
-    "SkillRegistry",
-    "SkillNotFoundError",
-    "SkillNotApprovedError",
-    "AgentNotAuthorisedError",
-]
+__all__ = ["SkillRegistry"]

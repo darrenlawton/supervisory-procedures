@@ -10,7 +10,7 @@ How the central innovation hub and business area spoke teams collaborate to gove
 
 The hub team owns:
 - The JSON Schema (`schema/`) — they control which schema versions are valid
-- The tooling (`supervisory_procedures/`) — CLI, validators, adapters
+- The tooling (`supervisory_procedures/`) — CLI, validators, registry, renderer
 - The CI pipeline (`.github/`) — blocks merges on validation failure
 - The overall governance framework
 
@@ -54,15 +54,18 @@ This means a spoke team can author and review a skill within their directory, bu
 ## PR Lifecycle
 
 ```
-Supervisor authors skill
+Supervisor authors skill.yml
         ↓
 supv new  (or manual YAML edit)
         ↓
-supv validate registry/<area>/<skill>.yml  (local check)
+supv render <area>/<skill-name>   (generate SKILL.md from skill.yml)
         ↓
+supv validate registry/ --strict  (local check — fails if SKILL.md is stale)
+        ↓
+git add registry/<area>/<skill-name>/   (commit skill.yml + SKILL.md together)
 git commit + push + open PR
         ↓
-CI: supv validate registry/ --strict  (automated, blocks on failure)
+CI: supv validate registry/ --strict   (automated — blocks merge on any failure)
         ↓
 Spoke CODEOWNER reviews content  (business sign-off)
         ↓
@@ -75,9 +78,19 @@ Skill is live (agents can load it)
 
 ---
 
+## The skill.yml / SKILL.md relationship
+
+`skill.yml` is the source of truth. `SKILL.md` is generated from it by `supv render` and is what the agent reads at runtime.
+
+**Both files must be committed together.** The CI pipeline runs `supv validate --strict`, which checks that `SKILL.md` exactly matches a fresh render of `skill.yml`. A PR that updates `skill.yml` without regenerating `SKILL.md` will fail CI.
+
+This ensures there is never a gap between the governed definition and the agent's instructions.
+
+---
+
 ## Adding a New Business Area
 
-1. Create `registry/<business_area>/README.md` listing owners and rationale
+1. Create `registry/<business_area>/README.md` listing owners, governance notes, and skill index
 2. Add a CODEOWNERS entry: `/registry/<business_area>/   @org/<team-name>`
 3. Submit a PR — hub team reviews the governance setup
 4. Once merged, the spoke team can start authoring skills
@@ -87,8 +100,8 @@ Skill is live (agents can load it)
 ## Schema Version Upgrades
 
 Schema version changes are hub-controlled. The process:
-1. Hub drafts the new schema version and CHANGELOG entry
+1. Hub drafts the new schema version and `schema/CHANGELOG.md` entry
 2. Hub runs a migration check across all registry skills
 3. Hub opens a PR with the updated `schema/skill.schema.json`
-4. After merge, spoke teams update `schema_version` in their skills at their own pace
-5. Both old and new schema versions are supported during a transition period
+4. After merge, spoke teams update `schema_version` in their skills and re-run `supv render`
+5. Both old and new schema versions may be supported during a transition period

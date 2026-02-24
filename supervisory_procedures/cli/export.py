@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 
 import click
@@ -35,6 +36,9 @@ def export(skill_id: str, registry: str | None) -> None:
         err_console.print(f"[red]Skill '{skill_id}' not found in registry.[/red]")
         sys.exit(1)
 
-    from supervisory_procedures.adapters.generic_json import GenericJsonAdapter
-    result = GenericJsonAdapter().export(skill_data)
-    click.echo(result)
+    envelope = {
+        "export_format": "supervisory-skill-v1",
+        "skill_id": skill_data.get("metadata", {}).get("id", "unknown"),
+        "skill": skill_data,
+    }
+    click.echo(json.dumps(envelope, indent=2, ensure_ascii=False, default=str))

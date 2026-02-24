@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,7 @@ class ValidationWarning:
         return f"WARNING {self.path}: {self.message}"
 
 
+@functools.cache
 def _load_schema() -> dict[str, Any]:
     with _SCHEMA_PATH.open() as f:
         return json.load(f)
@@ -85,7 +87,9 @@ def validate_skill(
 
 def _collect_warnings(path: Path, data: dict[str, Any]) -> list[ValidationWarning]:
     warnings: list[ValidationWarning] = []
-    agents: list[str] = data.get("metadata", {}).get("authorised_agents", [])
+    meta = data.get("metadata", {})
+
+    agents: list[str] = meta.get("authorised_agents", [])
     if _WILDCARD_AGENT in agents:
         warnings.append(
             ValidationWarning(
@@ -94,49 +98,64 @@ def _collect_warnings(path: Path, data: dict[str, Any]) -> list[ValidationWarnin
                 "Consider restricting to named agent IDs.",
             )
         )
-    status = data.get("metadata", {}).get("status", "")
+
+    status = meta.get("status", "")
     if status == "approved":
-        if not data.get("metadata", {}).get("approved_at"):
+        if not meta.get("approved_at"):
             warnings.append(
                 ValidationWarning(path, "status is 'approved' but approved_at is null")
             )
-        if not data.get("metadata", {}).get("approved_by"):
+        if not meta.get("approved_by"):
             warnings.append(
                 ValidationWarning(path, "status is 'approved' but approved_by is null")
             )
+
+    # Staleness check: only applies to directory-based skill.yml files
+    if path.name == "skill.yml":
+        warnings.extend(_check_skill_md_freshness(path, data))
+
     return warnings
+
+
+def _check_skill_md_freshness(path: Path, data: dict[str, Any]) -> list[ValidationWarning]:
+    """Warn if SKILL.md is missing or out of sync with the current render of skill.yml."""
+    from supervisory_procedures.core.renderer import render_skill_md  # avoid circular at module level
+
+    skill_md_path = path.parent / "SKILL.md"
+
+    if not skill_md_path.exists():
+        return [ValidationWarning(
+            path,
+            f"SKILL.md not found — run `supv render {data.get('metadata', {}).get('id', '')}` to generate it",
+        )]
+
+    expected = render_skill_md(data)
+    actual = skill_md_path.read_text()
+
+    if actual.strip() != expected.strip():
+        return [ValidationWarning(
+            path,
+            f"SKILL.md is stale — run `supv render {data.get('metadata', {}).get('id', '')}` to regenerate it",
+        )]
+
+    return []
 
 
 def validate_directory(
     directory: Path,
     strict: bool = False,
 ) -> tuple[list[tuple[Path, list[ValidationWarning]]], list[ValidationError]]:
-    """Validate skill YAML files under directory recursively.
-
-    Directory-based skills (skill.yml inside a named directory) take
-    precedence: when a directory contains skill.yml, any other *.yml files
-    in that same directory are skipped (they are treated as non-skill files).
+    """Validate all skill YAML files under directory recursively.
 
     Returns:
         (successes, failures)
         successes: list of (path, warnings) for valid skills
         failures: list of ValidationError for invalid skills
     """
-    # Directories that own a skill.yml — other .yml files there are non-skill
-    skill_yml_dirs: set[Path] = {
-        p.parent for p in directory.rglob("skill.yml")
-    }
-
-    yml_files: list[Path] = []
-    for path in sorted(directory.rglob("*.yml")):
-        if path.name != "skill.yml" and path.parent in skill_yml_dirs:
-            continue  # skip non-skill .yml files alongside a skill.yml
-        yml_files.append(path)
-
     successes: list[tuple[Path, list[ValidationWarning]]] = []
     failures: list[ValidationError] = []
 
-    for yml_path in yml_files:
+    for yml_path in sorted(directory.rglob("*.yml")):
         try:
             warnings = validate_skill(yml_path, strict=strict)
             successes.append((yml_path, warnings))
