@@ -10,12 +10,13 @@ The central team owns the schema and tooling. Each business area authors and gov
 
 ## What is an Agent Skill?
 
-An **Agent Skill** is a structured YAML document — authored by a business supervisor, version-controlled in Git, and approved via pull request. It formally answers four questions about an AI agent operating in their area:
+An **Agent Skill** is a structured YAML document — authored by a business supervisor, version-controlled in Git, and approved via pull request. It formally answers five questions about an AI agent operating in their area:
 
 - What is it **approved to do?** — an exhaustive allowlist of permitted actions
 - What must it **never do?** — absolute prohibitions
-- When should it **stop immediately?** — hard veto triggers that halt execution and escalate
-- Where does a **human decide?** — oversight checkpoints where approval is required before the agent continues
+- How should it **execute the task?** — an ordered sequence of steps defining the business workflow from start to finish, each mapped to a permitted activity
+- Where does a **human stay in the loop?** — control points that classify the level of human involvement required at each stage: automatic, notify, review, needs approval, or unconditional halt
+- Who is **authorised to run it?** — the specific agent IDs permitted to load and execute this skill
 
 Authoring a skill is the supervisory act. It is how a business area formally takes accountability for an agent's behaviour — drawing on the domain knowledge, regulatory context, and operational expertise that only they hold.
 
