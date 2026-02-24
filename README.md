@@ -8,11 +8,9 @@ Supervisory Procedures is built to solve that. It gives business supervisors a s
 
 The central team owns the schema and tooling. Each business area authors and governs its own skills.
 
-Agent skills - https://www.youtube.com/watch?v=CEvIs9y1uog
+## What is an [Agent Skill](https://www.youtube.com/watch?v=CEvIs9y1uog)?
 
-## What is an Agent Skill?
-
-An **Agent Skill** is a structured YAML document — authored by a business supervisor, version-controlled in Git, and approved via pull request. It formally answers five questions about an AI agent operating in their area:
+In the context of this framework, an **Agent Skill** is a structured YAML document — authored by a business supervisor, version-controlled in Git, and approved via pull request. It formally answers five questions about an AI agent operating in their area:
 
 - What is it **approved to do?** — an exhaustive allowlist of permitted actions
 - What must it **never do?** — absolute prohibitions
