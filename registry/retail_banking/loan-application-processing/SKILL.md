@@ -35,15 +35,15 @@ python registry/shared/validate-activity/scripts/validate_activity.py \
 
 If `"allowed": false` — halt immediately and log the attempt.
 
-| Step ID | Activity |
-|---------|----------|
+| Activity ID | Description |
+|-------------|-------------|
 | `retrieve-documents` | Retrieve and parse submitted application documents (proof of income, ID) |
 | `credit-score` | Query the internal credit scoring system for the applicant's risk score |
 | `sanctions-screening` | Cross-reference applicant details against the sanctions screening database |
 | `calculate-dti` | Calculate debt-to-income ratio using declared and verified income figures |
 | `generate-recommendation` | Generate a structured recommendation report for the human underwriter |
-| `send-progress-notification` | Send templated acknowledgement and status-update emails to the applicant |
-| `log-documents-retrieved` | Log all actions and data accesses to the audit trail |
+| `send-notification` | Send templated acknowledgement and status-update emails to the applicant |
+| `audit-log` | Log all actions and data accesses to the audit trail |
 
 ---
 ## What You Must Never Do

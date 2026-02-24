@@ -135,14 +135,31 @@ def _step_context() -> dict[str, Any]:
 def _step_scope() -> dict[str, Any]:
     """Step 5 / 9 — approved activities."""
     console.rule("[bold cyan]Step 5 / 9 — Scope (Approved Activities)[/bold cyan]")
-    activities = _collect_list("Approved activities — what the agent MAY do:", min_items=1)
+    console.print("Enter each approved activity. You'll be prompted for a description then an ID slug.")
+    activities: list[dict[str, str]] = []
+    while True:
+        console.print(f"\n  [bold]Activity #{len(activities) + 1}[/bold] (blank description to finish)")
+        desc = _ask("  Description:").strip()
+        if not desc:
+            if len(activities) < 1:
+                console.print("  [yellow]Please enter at least 1 activity.[/yellow]")
+                continue
+            break
+        suggested_id = _slug(desc)[:40]
+        act_id = _ask(f"  ID (slug):", default=suggested_id).strip()
+        activities.append({"id": act_id or suggested_id, "description": desc})
     return {"approved_activities": activities}
 
 
 def _step_constraints() -> dict[str, Any]:
     """Step 6 / 9 — procedural requirements and unacceptable actions."""
     console.rule("[bold cyan]Step 6 / 9 — Constraints[/bold cyan]")
-    requirements = _collect_list("Procedural requirements — steps the agent MUST follow:", min_items=1)
+    console.print(
+        "[dim]Procedural requirements are cross-cutting behavioural principles only.\n"
+        "Do not repeat constraints already expressed by workflow ordering, control points,\n"
+        "or unacceptable_actions.[/dim]"
+    )
+    requirements = _collect_list("Procedural requirements:", min_items=0)
     unacceptable = _collect_list("Unacceptable actions — what the agent must NEVER do:", min_items=1)
     return {
         "procedural_requirements": requirements,
@@ -200,19 +217,19 @@ def _step_control_points() -> list[dict[str, Any]]:
     return control_points
 
 
-def _step_workflow(approved_activities: list[str]) -> dict[str, Any]:
+def _step_workflow(approved_activities: list[dict[str, str]]) -> dict[str, Any]:
     """Step 8 / 9 — workflow steps."""
     console.rule("[bold cyan]Step 8 / 9 — Workflow Steps[/bold cyan]")
-    console.print(
-        "Define the ordered steps the agent will execute.\n"
-        "Each step's activity must exactly match an approved activity from Step 5."
-    )
+    console.print("Define the ordered steps the agent will execute.")
+    choices = [f"{a['id']}  —  {a['description']}" for a in approved_activities]
+    choice_to_id = {c: a["id"] for c, a in zip(choices, approved_activities)}
     steps: list[dict[str, Any]] = []
 
     while True:
         console.print(f"\n  [bold]Step #{len(steps) + 1}[/bold]")
         step_id = _slug(_ask("  ID (slug, e.g. check-identity):"))
-        activity = _ask_select("  Activity:", approved_activities)
+        selected = _ask_select("  Activity:", choices)
+        activity = choice_to_id[selected]
         cp_ref = _ask("  Control point ID to attach (optional, press Enter to skip):")
 
         step: dict[str, Any] = {

@@ -41,7 +41,14 @@ Full field-by-field reference for the `skill.schema.json` v2.0 format.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `approved_activities` | array[string] | ✓ | Exhaustive allowlist of what the agent MAY do (min 1). Every `workflow.steps[].activity` must exactly match an entry here. |
+| `approved_activities` | array[object] | ✓ | Exhaustive allowlist of what the agent MAY do (min 1). Each entry has an `id` (slug) and `description`. `workflow.steps[].activity` references an activity `id`. |
+
+### `scope.approved_activities[]`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string (slug) | ✓ | Kebab-case identifier, e.g. `audit-log`. Referenced by `workflow.steps[].activity`. |
+| `description` | string | ✓ | Plain English description of what the agent does in this activity. |
 
 ---
 
@@ -49,7 +56,7 @@ Full field-by-field reference for the `skill.schema.json` v2.0 format.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `procedural_requirements` | array[string] | ✓ | Steps the agent MUST follow (min 1) |
+| `procedural_requirements` | array[string] | ✓ (key required, list may be empty) | Cross-cutting behavioural principles the agent must observe throughout the workflow. Do not repeat constraints already expressed by workflow ordering, control points, or `unacceptable_actions`. |
 | `unacceptable_actions` | array[string] | ✓ | Absolute prohibitions — the agent must NEVER do these (min 1) |
 
 ---
@@ -93,7 +100,7 @@ Array of step objects (min 1). Steps are executed in array order — the agent m
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `id` | string (slug) | ✓ | Step identifier, e.g. `sanctions-screening`. Used by `validate_activity.py` to verify the step is in scope. |
-| `activity` | string | ✓ | Must exactly match an entry in `scope.approved_activities` |
+| `activity` | string (slug) | ✓ | ID of an approved activity in `scope.approved_activities` |
 | `control_point` | string | | ID of a control point (without `trigger_condition`) to invoke after this step completes |
 | `uses_skill` | string | | Reference to a shared helper skill, e.g. `shared/audit-logging` |
 

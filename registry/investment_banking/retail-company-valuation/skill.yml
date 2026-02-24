@@ -34,24 +34,30 @@ context:
 
 scope:
   approved_activities:
-    - Check the target company against the firm's restricted and watch lists prior to any data retrieval
-    - Retrieve public financial filings (10-K, 20-F, annual reports) for target and comparable companies
-    - Pull approved market data feeds for share price, EV, and trading multiples
-    - Calculate EV/EBITDA, P/E, EV/Sales, and EV/EBIT multiples for comparable companies
-    - Build DCF model inputs using normalised historical financials and published consensus forecasts
-    - Construct LBO model skeleton with standard leverage assumptions
-    - Flag data gaps or anomalies in source financials for analyst follow-up
-    - Generate a structured valuation summary report for senior banker review
-    - Package and deliver the approved valuation model to authorised recipients
-    - Log all data sources, versions, and assumptions to the audit trail
+    - id: restricted-list-check
+      description: Check the target company against the firm's restricted and watch lists prior to any data retrieval
+    - id: retrieve-public-filings
+      description: Retrieve public financial filings (10-K, 20-F, annual reports) for target and comparable companies
+    - id: pull-market-data
+      description: Pull approved market data feeds for share price, EV, and trading multiples
+    - id: calculate-trading-multiples
+      description: Calculate EV/EBITDA, P/E, EV/Sales, and EV/EBIT multiples for comparable companies
+    - id: build-dcf-inputs
+      description: Build DCF model inputs using normalised historical financials and published consensus forecasts
+    - id: construct-lbo-skeleton
+      description: Construct LBO model skeleton with standard leverage assumptions
+    - id: flag-data-anomalies
+      description: Flag data gaps or anomalies in source financials for analyst follow-up
+    - id: generate-valuation-report
+      description: Generate a structured valuation summary report for senior banker review
+    - id: deliver-model
+      description: Package and deliver the approved valuation model to authorised recipients
+    - id: audit-log
+      description: Log all data sources, versions, and assumptions to the audit trail
 
 constraints:
   procedural_requirements:
-    - Confirm the target company is not on the firm's active M&A deal list before proceeding
     - Source all market data exclusively from the approved vendor list
-    - Record the exact data source and retrieval timestamp for every input used
-    - Present the draft valuation output to a senior banker for review before any client use
-    - Obtain explicit sign-off from Coverage MD before the model is shared externally
   unacceptable_actions:
     - Use non-public (inside) information as a model input
     - Publish or share the valuation with any external party without Coverage MD approval
@@ -158,58 +164,58 @@ control_points:
 workflow:
   steps:
     - id: restricted-list-check
-      activity: "Check the target company against the firm's restricted and watch lists prior to any data retrieval"
+      activity: restricted-list-check
       control_point: restricted-list-cleared
 
     - id: log-list-check
-      activity: "Log all data sources, versions, and assumptions to the audit trail"
+      activity: audit-log
 
     - id: retrieve-public-filings
-      activity: "Retrieve public financial filings (10-K, 20-F, annual reports) for target and comparable companies"
+      activity: retrieve-public-filings
 
     - id: log-filings-retrieved
-      activity: "Log all data sources, versions, and assumptions to the audit trail"
+      activity: audit-log
 
     - id: pull-market-data
-      activity: "Pull approved market data feeds for share price, EV, and trading multiples"
+      activity: pull-market-data
 
     - id: log-market-data-retrieved
-      activity: "Log all data sources, versions, and assumptions to the audit trail"
+      activity: audit-log
 
     - id: calculate-trading-multiples
-      activity: "Calculate EV/EBITDA, P/E, EV/Sales, and EV/EBIT multiples for comparable companies"
+      activity: calculate-trading-multiples
 
     - id: log-multiples-calculated
-      activity: "Log all data sources, versions, and assumptions to the audit trail"
+      activity: audit-log
 
     - id: build-dcf-inputs
-      activity: "Build DCF model inputs using normalised historical financials and published consensus forecasts"
+      activity: build-dcf-inputs
 
     - id: log-dcf-built
-      activity: "Log all data sources, versions, and assumptions to the audit trail"
+      activity: audit-log
 
     - id: construct-lbo-skeleton
-      activity: "Construct LBO model skeleton with standard leverage assumptions"
+      activity: construct-lbo-skeleton
 
     - id: log-lbo-constructed
-      activity: "Log all data sources, versions, and assumptions to the audit trail"
+      activity: audit-log
 
     - id: flag-data-anomalies
-      activity: "Flag data gaps or anomalies in source financials for analyst follow-up"
+      activity: flag-data-anomalies
 
     - id: generate-valuation-report
-      activity: "Generate a structured valuation summary report for senior banker review"
+      activity: generate-valuation-report
       control_point: valuation-senior-review
 
     - id: log-report-generated
-      activity: "Log all data sources, versions, and assumptions to the audit trail"
+      activity: audit-log
 
     - id: deliver-model
-      activity: "Package and deliver the approved valuation model to authorised recipients"
+      activity: deliver-model
       control_point: external-sharing-approval
 
     - id: log-delivery
-      activity: "Log all data sources, versions, and assumptions to the audit trail"
+      activity: audit-log
 
 helper_skills:
   - id: shared/audit-logging

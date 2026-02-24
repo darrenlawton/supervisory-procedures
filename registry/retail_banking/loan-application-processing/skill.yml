@@ -35,21 +35,24 @@ context:
 
 scope:
   approved_activities:
-    - Retrieve and parse submitted application documents (proof of income, ID)
-    - Query the internal credit scoring system for the applicant's risk score
-    - Cross-reference applicant details against the sanctions screening database
-    - Calculate debt-to-income ratio using declared and verified income figures
-    - Generate a structured recommendation report for the human underwriter
-    - Send templated acknowledgement and status-update emails to the applicant
-    - Log all actions and data accesses to the audit trail
+    - id: retrieve-documents
+      description: Retrieve and parse submitted application documents (proof of income, ID)
+    - id: credit-score
+      description: Query the internal credit scoring system for the applicant's risk score
+    - id: sanctions-screening
+      description: Cross-reference applicant details against the sanctions screening database
+    - id: calculate-dti
+      description: Calculate debt-to-income ratio using declared and verified income figures
+    - id: generate-recommendation
+      description: Generate a structured recommendation report for the human underwriter
+    - id: send-notification
+      description: Send templated acknowledgement and status-update emails to the applicant
+    - id: audit-log
+      description: Log all actions and data accesses to the audit trail
 
 constraints:
   procedural_requirements:
     - Verify applicant identity against two independent sources before proceeding
-    - Run sanctions screening before any credit check is initiated
-    - Record a timestamped audit log entry for every data access and decision step
-    - Present the structured recommendation to a human underwriter before any offer is issued
-    - Obtain explicit underwriter approval before communicating a lending decision to the applicant
     - Apply consistent evaluation criteria across all applications regardless of applicant demographics
   unacceptable_actions:
     - Issue a loan offer or rejection directly to the applicant without underwriter approval
@@ -192,42 +195,42 @@ control_points:
 workflow:
   steps:
     - id: retrieve-documents
-      activity: "Retrieve and parse submitted application documents (proof of income, ID)"
+      activity: retrieve-documents
       control_point: identity-verified
 
     - id: log-documents-retrieved
-      activity: "Log all actions and data accesses to the audit trail"
+      activity: audit-log
 
     - id: sanctions-screening
-      activity: "Cross-reference applicant details against the sanctions screening database"
+      activity: sanctions-screening
 
     - id: log-sanctions-complete
-      activity: "Log all actions and data accesses to the audit trail"
+      activity: audit-log
 
     - id: credit-score
-      activity: "Query the internal credit scoring system for the applicant's risk score"
+      activity: credit-score
 
     - id: log-credit-retrieved
-      activity: "Log all actions and data accesses to the audit trail"
+      activity: audit-log
 
     - id: calculate-dti
-      activity: "Calculate debt-to-income ratio using declared and verified income figures"
+      activity: calculate-dti
 
     - id: log-dti-calculated
-      activity: "Log all actions and data accesses to the audit trail"
+      activity: audit-log
 
     - id: send-progress-notification
-      activity: "Send templated acknowledgement and status-update emails to the applicant"
+      activity: send-notification
 
     - id: generate-recommendation
-      activity: "Generate a structured recommendation report for the human underwriter"
+      activity: generate-recommendation
       control_point: creditworthiness-assessment-review
 
     - id: log-recommendation-generated
-      activity: "Log all actions and data accesses to the audit trail"
+      activity: audit-log
 
     - id: notify-applicant-decision
-      activity: "Send templated acknowledgement and status-update emails to the applicant"
+      activity: send-notification
       control_point: decision-communication
 
 helper_skills:

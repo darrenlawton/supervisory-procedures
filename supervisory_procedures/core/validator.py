@@ -110,6 +110,16 @@ def _collect_warnings(path: Path, data: dict[str, Any]) -> list[ValidationWarnin
                 ValidationWarning(path, "status is 'approved' but approved_by is null")
             )
 
+    # Cross-reference: workflow step activity IDs must exist in scope.approved_activities
+    approved_ids = {a["id"] for a in data.get("scope", {}).get("approved_activities", []) if isinstance(a, dict)}
+    for step in data.get("workflow", {}).get("steps", []):
+        activity = step.get("activity", "")
+        if activity and activity not in approved_ids:
+            warnings.append(ValidationWarning(
+                path,
+                f"Workflow step '{step.get('id', '?')}': activity '{activity}' not found in scope.approved_activities",
+            ))
+
     # Staleness check: only applies to directory-based skill.yml files
     if path.name == "skill.yml":
         warnings.extend(_check_skill_md_freshness(path, data))

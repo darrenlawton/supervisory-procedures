@@ -35,8 +35,8 @@ python registry/shared/validate-activity/scripts/validate_activity.py \
 
 If `"allowed": false` — halt immediately and log the attempt.
 
-| Step ID | Activity |
-|---------|----------|
+| Activity ID | Description |
+|-------------|-------------|
 | `restricted-list-check` | Check the target company against the firm's restricted and watch lists prior to any data retrieval |
 | `retrieve-public-filings` | Retrieve public financial filings (10-K, 20-F, annual reports) for target and comparable companies |
 | `pull-market-data` | Pull approved market data feeds for share price, EV, and trading multiples |
@@ -46,7 +46,7 @@ If `"allowed": false` — halt immediately and log the attempt.
 | `flag-data-anomalies` | Flag data gaps or anomalies in source financials for analyst follow-up |
 | `generate-valuation-report` | Generate a structured valuation summary report for senior banker review |
 | `deliver-model` | Package and deliver the approved valuation model to authorised recipients |
-| `log-list-check` | Log all data sources, versions, and assumptions to the audit trail |
+| `audit-log` | Log all data sources, versions, and assumptions to the audit trail |
 
 ---
 ## What You Must Never Do

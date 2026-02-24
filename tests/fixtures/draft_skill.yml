@@ -23,7 +23,8 @@ context:
 
 scope:
   approved_activities:
-    - Test read operations
+    - id: run-test
+      description: Test read operations
 
 constraints:
   procedural_requirements:
@@ -41,4 +42,4 @@ control_points:
 workflow:
   steps:
     - id: run-test
-      activity: "Test read operations"
+      activity: run-test

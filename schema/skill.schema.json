@@ -140,9 +140,25 @@
       "properties": {
         "approved_activities": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "object",
+            "required": ["id", "description"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$",
+                "description": "Slug identifier for this activity, e.g. audit-log"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Plain English description of what the agent does"
+              }
+            }
+          },
           "minItems": 1,
-          "description": "Exhaustive list of what the agent MAY do"
+          "description": "Exhaustive list of what the agent MAY do. Each entry has an id and description. workflow.steps[].activity references an activity id."
         }
       }
     },
@@ -155,8 +171,8 @@
         "procedural_requirements": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
-          "minItems": 1,
-          "description": "Steps the agent MUST follow"
+          "minItems": 0,
+          "description": "Cross-cutting behavioural principles the agent must observe throughout the workflow. Do not repeat constraints already expressed by workflow ordering, control points, or unacceptable_actions."
         },
         "unacceptable_actions": {
           "type": "array",
@@ -244,8 +260,8 @@
               },
               "activity": {
                 "type": "string",
-                "minLength": 1,
-                "description": "Must match exactly one entry in scope.approved_activities."
+                "pattern": "^[a-z0-9-]+$",
+                "description": "ID of an approved activity in scope.approved_activities."
               },
               "control_point": {
                 "type": "string",

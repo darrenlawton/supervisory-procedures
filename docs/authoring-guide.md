@@ -52,7 +52,7 @@ A skill has seven sections:
 | `metadata` | Who owns this skill, what version it is, who is approved to use it |
 | `context` | What business activity this covers and why AI is appropriate |
 | `scope` | The **complete list** of activities the agent is allowed to perform |
-| `constraints` | Steps the agent must follow, and things it must never do |
+| `constraints` | Cross-cutting behavioural principles the agent must observe throughout, and absolute prohibitions |
 | `control_points` | Every point where human oversight applies — from unconditional halt to automatic pass-through |
 | `workflow` | The ordered sequence of steps the agent must follow, each mapped to an approved activity |
 | `helper_skills` | Shared infrastructure skills used in the workflow (audit logging, checkpoint enforcement, scope validation) |
@@ -79,9 +79,22 @@ Control points with a `trigger_condition` fire automatically when that condition
 
 ### 1. The Approved Activities List is Exhaustive
 
-`scope.approved_activities` is an **allowlist** — not a suggestion. Anything not on the list is forbidden. Write descriptions carefully and specifically.
+`scope.approved_activities` is an **allowlist** — not a suggestion. Anything not on the list is forbidden. Each activity has an `id` (slug) and a `description`.
 
-Good: _"Calculate debt-to-income ratio using declared and verified income figures"_
+The `id` is referenced by `workflow.steps[].activity`, so choose something stable and meaningful:
+
+```yaml
+scope:
+  approved_activities:
+    - id: calculate-dti
+      description: Calculate debt-to-income ratio using declared and verified income figures
+    - id: audit-log
+      description: Log all actions and data accesses to the audit trail
+```
+
+Multiple workflow steps can reference the same activity (e.g. several `log-*` steps all referencing `audit-log`).
+
+Good description: _"Calculate debt-to-income ratio using declared and verified income figures"_
 Too vague: _"Process financial data"_
 
 ### 2. Define Vetoed Control Points for Your Highest Risks
@@ -95,13 +108,39 @@ Use `classification: vetoed` for conditions where continued agent operation woul
 
 ### 3. Map Every Workflow Step to an Approved Activity
 
-Each step in `workflow.steps` must reference an `activity` that appears exactly in `scope.approved_activities`. The agent validates this at each step before executing.
+Each step in `workflow.steps` must reference an `activity` that is the `id` of an entry in `scope.approved_activities`. Multiple steps may reference the same activity ID (e.g. repeated logging steps):
 
-### 4. Name Your Authorised Agents Explicitly
+```yaml
+workflow:
+  steps:
+    - id: calculate-dti
+      activity: calculate-dti
+    - id: log-dti-calculated
+      activity: audit-log   # same activity as other log-* steps
+```
+
+The agent validates each step ID against the workflow at runtime before executing.
+
+### 4. Keep Procedural Requirements Cross-Cutting
+
+`constraints.procedural_requirements` is for behavioural principles that apply throughout the workflow and cannot be expressed as a single step or control point. Do not duplicate constraints already captured elsewhere:
+
+| Already captured by | Don't repeat in `procedural_requirements` |
+|---|---|
+| Workflow step order | "Run sanctions screening before any credit check" |
+| A control point | "Present recommendation to underwriter before issuing offer" |
+| `log-*` workflow steps | "Record an audit log entry for every data access" |
+| `unacceptable_actions` | Anything the agent must never do |
+
+Good candidates: regulatory principles that apply throughout (e.g. equality / non-discrimination), standing references to external SOPs, output quality requirements that apply to multiple steps.
+
+The field may be an empty list if all constraints are already expressed elsewhere.
+
+### 5. Name Your Authorised Agents Explicitly
 
 `authorised_agents` controls which AI agents can load this skill. Use the agent's full ID (e.g. `loan-processor-agent-prod`). Avoid `*` (which allows any agent) except in controlled test environments.
 
-### 5. Status Starts as `draft`
+### 6. Status Starts as `draft`
 
 New skills start with `status: draft`. The wizard sets this automatically. A draft skill cannot be loaded by any agent. The skill is promoted to `approved` by the hub team after the pull request is reviewed.
 

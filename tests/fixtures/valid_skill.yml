@@ -23,7 +23,8 @@ context:
 
 scope:
   approved_activities:
-    - Perform read-only queries against the test database
+    - id: run-query
+      description: Perform read-only queries against the test database
 
 constraints:
   procedural_requirements:
@@ -47,5 +48,5 @@ control_points:
 workflow:
   steps:
     - id: run-query
-      activity: "Perform read-only queries against the test database"
+      activity: run-query
       control_point: initial-review

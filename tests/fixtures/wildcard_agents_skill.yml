@@ -23,7 +23,8 @@ context:
 
 scope:
   approved_activities:
-    - Read-only data access
+    - id: read-data
+      description: Read-only data access
 
 constraints:
   procedural_requirements:
@@ -41,4 +42,4 @@ control_points:
 workflow:
   steps:
     - id: read-data
-      activity: "Read-only data access"
+      activity: read-data

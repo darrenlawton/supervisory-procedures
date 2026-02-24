@@ -106,7 +106,7 @@ supv export retail_banking/loan-application-processing
 ## How your skill is enforced
 
 **At authoring time:**
-- `supv validate` checks `skill.yml` against the JSON Schema
+- `supv validate` checks `skill.yml` against the JSON Schema and warns if any `workflow.steps[].activity` references an ID not in `scope.approved_activities`
 - `supv validate --strict` also fails if `SKILL.md` is missing or stale
 
 **At load time**, three layers are checked automatically when an agent calls `get_skill()`:

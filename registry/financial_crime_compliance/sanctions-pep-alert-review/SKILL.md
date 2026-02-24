@@ -35,8 +35,8 @@ python registry/shared/validate-activity/scripts/validate_activity.py \
 
 If `"allowed": false` — halt immediately and log the attempt.
 
-| Step ID | Activity |
-|---------|----------|
+| Activity ID | Description |
+|-------------|-------------|
 | `query-sanctions-lists` | Query the OFAC Specially Designated Nationals list and HM Treasury/EU consolidated sanctions lists for name matches |
 | `query-pep-database` | Query the PEP (Politically Exposed Person) database for name matches |
 | `query-adverse-media` | Query adverse media sources for references to the customer's name |
@@ -49,7 +49,7 @@ If `"allowed": false` — halt immediately and log the attempt.
 | `classify-hits` | Classify each hit as: confirmed match, partial match (yellow flag), or false positive |
 | `generate-evidence-package` | Generate a structured evidence package summarising the data sources consulted, the reasoning followed, and the recommended disposition |
 | `present-recommendation` | Present the recommendation (Accept / Decline / Partial Match) to the human compliance officer for final approval |
-| `log-audit` | Log all data accesses, sources queried, reasoning steps, and recommended actions to the immutable audit trail |
+| `audit-log` | Log all data accesses, sources queried, reasoning steps, and recommended actions to the immutable audit trail |
 
 ---
 ## What You Must Never Do

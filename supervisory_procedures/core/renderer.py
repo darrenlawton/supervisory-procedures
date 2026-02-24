@@ -148,17 +148,8 @@ def _initialisation(skill_data: dict[str, Any]) -> str:
 
 
 def _approved_activities(skill_data: dict[str, Any]) -> str:
-    sid = _skill_id(skill_data)
     syml = _skill_yml_path(skill_data)
     activities = skill_data.get("scope", {}).get("approved_activities", [])
-    steps = skill_data.get("workflow", {}).get("steps", [])
-
-    # Map first workflow step ID for each activity
-    activity_to_step: dict[str, str] = {}
-    for step in steps:
-        act = step.get("activity", "")
-        if act not in activity_to_step:
-            activity_to_step[act] = step["id"]
 
     validate_cmd = (
         f"python {_SHARED}/validate-activity/scripts/validate_activity.py \\\n"
@@ -167,7 +158,7 @@ def _approved_activities(skill_data: dict[str, Any]) -> str:
     )
 
     rows = "\n".join(
-        f"| `{activity_to_step.get(act, '—')}` | {act} |" for act in activities
+        f"| `{act['id']}` | {act['description']} |" for act in activities
     )
 
     return (
@@ -176,8 +167,8 @@ def _approved_activities(skill_data: dict[str, Any]) -> str:
         "Validate each step before executing:\n\n"
         f"```bash\n{validate_cmd}\n```\n\n"
         "If `\"allowed\": false` — halt immediately and log the attempt.\n\n"
-        "| Step ID | Activity |\n"
-        "|---------|----------|\n"
+        "| Activity ID | Description |\n"
+        "|-------------|-------------|\n"
         f"{rows}\n\n---"
     )
 
@@ -314,6 +305,10 @@ def _workflow(skill_data: dict[str, Any]) -> str:
     syml = _skill_yml_path(skill_data)
     steps = skill_data.get("workflow", {}).get("steps", [])
     cp_idx = _cp_index(skill_data)
+    activity_map = {
+        a["id"]: a["description"]
+        for a in skill_data.get("scope", {}).get("approved_activities", [])
+    }
 
     if not steps:
         return ""
@@ -327,7 +322,8 @@ def _workflow(skill_data: dict[str, Any]) -> str:
 
     for i, step in enumerate(steps, 1):
         step_id = step["id"]
-        activity = step.get("activity", "")
+        activity_id = step.get("activity", "")
+        activity = activity_map.get(activity_id, activity_id)
         cp_ref = step.get("control_point")
         cp = cp_idx.get(cp_ref) if cp_ref else None
 
@@ -337,7 +333,7 @@ def _workflow(skill_data: dict[str, Any]) -> str:
         lines += [
             f"### Step {i} — {step_id}",
             "",
-            f"**Activity:** {activity}",
+            f"**Activity:** {activity}",  # resolved description
             "",
             f"```bash\n{validate_cmd}\n\n{audit_cmd}\n```",
         ]
