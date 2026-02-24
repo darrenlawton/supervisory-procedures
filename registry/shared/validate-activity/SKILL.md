@@ -1,25 +1,24 @@
 ---
 name: validate-activity
 description: >
-  Validates that a proposed agent action is within the approved_activities
-  allowlist for the current skill. Use before performing any activity to
-  enforce the scope boundary. Reads the allowlist from a JSON file supplied
-  by the calling skill, so each skill maintains its own list.
+  Validates that a workflow step is within the approved scope for the current
+  skill. Use before performing any step to enforce the scope boundary. Reads
+  the workflow definition from the skill's skill.yml file.
 user-invocable: false
 ---
 
 # Validate Activity
 
 Shared enforcement script for supervisory skill scope boundaries. Call this
-before every agent action to verify it falls within the approved_activities
-allowlist. If the script exits non-zero, do not proceed with the activity.
+before every workflow step to verify it is a valid step in the skill's workflow.
+If the script exits non-zero, do not proceed.
 
 ## Usage
 
 ```bash
 python registry/shared/validate-activity/scripts/validate_activity.py \
-  --activity <activity-slug> \
-  --allowlist <path-to-allowlist.json>
+  --skill <path-to-skill.yml> \
+  --step <step-id>
 ```
 
 Exit 0 = permitted; exit 1 = not permitted.
@@ -27,21 +26,21 @@ Exit 0 = permitted; exit 1 = not permitted.
 ## Output
 
 ```json
-{"allowed": true, "activity": "run_sanctions_screening"}
+{"allowed": true, "step": "sanctions-screening"}
 ```
 or
 ```json
-{"allowed": false, "activity": "send_external_email", "reason": "'send_external_email' is not in the approved_activities allowlist"}
+{"allowed": false, "step": "send-external-email", "reason": "'send-external-email' is not a valid workflow step in this skill"}
 ```
 
 ## Example
 
 ```bash
 python registry/shared/validate-activity/scripts/validate_activity.py \
-  --activity run_sanctions_screening \
-  --allowlist scripts/approved_activities.json
-# {"allowed": true, "activity": "run_sanctions_screening"}
+  --skill registry/retail_banking/loan-application-processing/skill.yml \
+  --step sanctions-screening
+# {"allowed": true, "step": "sanctions-screening"}
 ```
 
 If the result contains `"allowed": false`, halt immediately. Do not perform
-the activity. Log the attempt via the audit-logging skill.
+the step. Log the attempt via the audit-logging skill.

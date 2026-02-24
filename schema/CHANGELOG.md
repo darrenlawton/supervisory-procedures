@@ -1,18 +1,33 @@
 # Schema Changelog
 
+## v2.0 (2026-02-24)
+
+### Breaking changes
+- `hard_veto_triggers` and `oversight_checkpoints` **removed**. Replaced by a unified `control_points` array where each entry has a `classification` (`vetoed`, `needs_approval`, `review`, `notify`, `auto`).
+- `scope.approved_activities` items changed from plain strings to objects with `id` (slug) and `description`.
+- `workflow.steps[].activity` now references an activity `id` from `scope.approved_activities` instead of matching the full description string.
+- `constraints.procedural_requirements` minimum items changed from 1 to 0. List may be empty when all constraints are expressed by workflow ordering, control points, or `unacceptable_actions`.
+- `schema_version` enum changed from `"1.0"` / `"1.1"` to `"2.0"`.
+
+### Added
+- `control_points` array (required, min 1) — unified model for all human oversight, from unconditional halt (`vetoed`) to automatic pass-through (`auto`). Each control point has `id`, `name`, `description`, `classification`, and optional fields: `trigger_condition`, `condition_hint`, `who_reviews`, `escalation_contact`, `sla_hours`.
+- `workflow.steps[].control_point` — references a control point `id` (without `trigger_condition`) to invoke after the step completes. Replaces the separate `veto_trigger` and `checkpoint` fields from v1.1.
+- `SKILL.md` generation — `supv render` generates a Claude Agent Skills compatible instruction document from `skill.yml`. CI validates that `SKILL.md` matches the current `skill.yml` in strict mode.
+
+### Removed
+- `hard_veto_triggers` block
+- `oversight_checkpoints` block
+- `workflow.steps[].veto_trigger`
+- `workflow.steps[].checkpoint`
+
+---
+
 ## v1.1 (2026-02-23)
 
 ### Added
-- `workflow` block (required) — the ordered sequence of steps the agent must follow. Each step maps 1:1 to an entry in `scope.approved_activities` and may reference a `veto_trigger`, `checkpoint`, or `uses_skill` by ID.
-- `helper_skills` block (optional) — declares centrally-maintained helper skills from `registry/shared/` that this skill delegates to in its workflow.
-- `metadata.type` field (optional) — enum `standard | shared`. Set to `shared` for centrally-maintained helper skills in `registry/shared/`.
-- `schema_version` enum extended to include `"1.1"`.
-
-### Notes
-- `workflow.steps[].activity` must match an entry in `scope.approved_activities` exactly (validated at runtime by the registry; not enforced by JSON Schema due to cross-field reference limits).
-- `workflow.steps[].veto_trigger` and `workflow.steps[].checkpoint` must match IDs in `hard_veto_triggers` and `oversight_checkpoints` respectively.
-- `helper_skills[].id` and `workflow.steps[].uses_skill` must use the `shared/<slug>` pattern — only skills in `registry/shared/` may be referenced.
-- Helper skills in `registry/shared/` should only be created where genuine reuse exists across two or more business area skills.
+- `workflow` block (required) — the ordered sequence of steps the agent must follow.
+- `helper_skills` block (optional) — declares centrally-maintained helper skills from `registry/shared/`.
+- `metadata.type` field (optional) — enum `standard | shared`.
 
 ---
 
@@ -23,7 +38,7 @@ Initial release of the Agent Skill schema.
 ### Structure
 - `metadata` — identity, versioning, supervisor ownership, authorised agents
 - `context` — business description, rationale, regulations, risk classification
-- `scope` — approved activities (exhaustive allowlist)
+- `scope` — approved activities (exhaustive allowlist, plain string items)
 - `constraints` — procedural requirements and unacceptable actions
 - `hard_veto_triggers` — conditions that halt agent execution immediately
 - `oversight_checkpoints` — workflow checkpoints and condition-triggered checkpoints

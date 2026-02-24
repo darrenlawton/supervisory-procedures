@@ -14,9 +14,10 @@
 _Complete before opening this PR._
 
 - [ ] I have read the [Authoring Guide](../docs/authoring-guide.md)
-- [ ] The skill has been validated locally: `supv validate registry/<path>.yml`
-- [ ] All **approved activities** are explicitly listed — the list is exhaustive
-- [ ] At least one **hard veto trigger** is defined
+- [ ] The skill has been validated locally: `supv validate registry/<path>/skill.yml --strict`
+- [ ] `SKILL.md` has been generated: `supv render <business_area>/<skill-name>`
+- [ ] All **approved activities** are explicitly listed with `id` and `description` — the list is exhaustive
+- [ ] At least one **control point with `vetoed` classification** is defined
 - [ ] **Authorised agents** are named explicitly (not `*`)
 - [ ] The **supervisor email** is current and monitored
 - [ ] **Applicable regulations** have been reviewed with the compliance team
@@ -29,7 +30,7 @@ _Complete before opening this PR._
 
 ## For Hub Team Review
 
-- [ ] Schema version is `1.0` (or PR includes a schema version bump with CHANGELOG update)
+- [ ] Schema version is `2.0` (or PR includes a schema version bump with CHANGELOG update)
 - [ ] CI `validate-skills` check passes
 - [ ] CODEOWNERS has been updated if a new business area directory was created
 

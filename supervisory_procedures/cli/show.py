@@ -116,7 +116,7 @@ def _render_skill(data: dict) -> None:
     console.print()
     console.rule("[bold]Approved Activities[/bold]")
     for activity in scope.get("approved_activities", []):
-        console.print(f"  [green]✓[/green] {activity}")
+        console.print(f"  [green]✓[/green] [cyan]{activity['id']}[/cyan]  {activity['description']}")
 
     # Constraints
     console.print()
@@ -155,6 +155,6 @@ def _render_skill(data: dict) -> None:
         for i, step in enumerate(workflow_steps, 1):
             cp_ref = f"  → {step['control_point']}" if step.get("control_point") else ""
             console.print(f"  [dim]{i:2}.[/dim] [cyan]{step.get('id', '')}[/cyan]{cp_ref}")
-            console.print(f"       {step.get('activity', '')}")
+            console.print(f"       activity: {step.get('activity', '')}")
 
     console.print()
