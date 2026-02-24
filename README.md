@@ -1,4 +1,4 @@
-# Supervisory Procedures — Skill-as-Code Platform
+# Supervisory Procedures — Skill-as-Code Framework
 
 **The people accountable for AI agents rarely control them. This tool changes that.**
 
@@ -7,6 +7,8 @@ Organisations adopting agentic AI face a structural problem: the central team th
 Supervisory Procedures is built to solve that. It gives business supervisors a structured way to exercise their oversight accountability — defining exactly what an AI agent is permitted to do in their area, what must never happen, and where a human must stay in the loop.
 
 The central team owns the schema and tooling. Each business area authors and governs its own skills.
+
+Agent skills - https://www.youtube.com/watch?v=CEvIs9y1uog
 
 ## What is an Agent Skill?
 
