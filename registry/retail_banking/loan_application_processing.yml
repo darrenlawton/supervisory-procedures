@@ -1,8 +1,8 @@
 metadata:
   id: retail_banking/loan-application-processing
   name: Loan Application Processing
-  version: 1.0.0
-  schema_version: "1.1"
+  version: 2.0.0
+  schema_version: "2.0"
   business_area: retail_banking
   supervisor:
     name: Sarah Johnson
@@ -58,128 +58,153 @@ constraints:
     - Share application data with third parties not listed in the data processing agreement
     - Retain applicant personal data beyond the 7-year regulatory retention period
 
-hard_veto_triggers:
+control_points:
+  # --- vetoed: agent halts unconditionally, no human override ---
+
   - id: sanctions-match
+    name: Sanctions List Match
     description: >
-      A positive match is returned when the applicant's name and date of birth
-      are checked against the HM Treasury or OFAC consolidated sanctions lists.
+      A positive match was returned when the applicant's name and date of birth
+      were checked against the HM Treasury or OFAC consolidated sanctions lists.
+      Processing must halt immediately and be escalated to the Financial Crime team.
+    classification: vetoed
+    trigger_condition: >
+      Positive match returned from HM Treasury or OFAC sanctions screening with
+      match_confidence >= 0.85 or exact_match == true.
     condition_hint: >
       sanctions_screening_result.match_confidence >= 0.85 OR
       sanctions_screening_result.exact_match == true
-    action: halt_and_escalate
     escalation_contact: financial-crime-team@bank.example.com
 
   - id: identity-verification-failure
+    name: Identity Verification Failure
     description: >
       The agent cannot verify the applicant's identity against two independent
-      sources after exhausting available verification methods.
-    action: halt_and_notify
+      sources after exhausting available verification methods. Processing must
+      halt and the underwriting team must be notified.
+    classification: vetoed
+    trigger_condition: >
+      Agent has exhausted all available identity verification methods and cannot
+      confirm the applicant's identity against two independent sources.
     escalation_contact: underwriting-team@bank.example.com
 
   - id: data-quality-critical
+    name: Critical Data Quality Failure
     description: >
       Critical data required for a compliant creditworthiness assessment is
       missing or cannot be retrieved (e.g. credit bureau unavailable, income
-      documents unreadable).
+      documents unreadable). Processing must halt and the underwriting team
+      must be notified.
+    classification: vetoed
+    trigger_condition: >
+      Critical required fields are missing or external services return errors
+      that prevent a compliant assessment from being completed.
     condition_hint: required_fields_missing.count > 0 OR external_service_errors.critical == true
-    action: halt_and_notify
     escalation_contact: underwriting-team@bank.example.com
 
   - id: protected-characteristic-detected
+    name: Protected Characteristic Detected
     description: >
       A data source or scoring model attempts to supply a protected characteristic
-      (age band excepted by FCA) as a model feature.
+      (age band excepted by FCA) as a model feature. Processing must halt
+      immediately and be escalated to Ethics and Compliance.
+    classification: vetoed
+    trigger_condition: >
+      A data source or scoring model exposes a protected characteristic
+      (e.g. ethnicity, religion, gender, disability) as a model input feature.
     condition_hint: feature_flags.contains_protected_characteristic == true
-    action: halt_and_escalate
     escalation_contact: ethics-and-compliance@bank.example.com
 
-oversight_checkpoints:
-  workflow_checkpoints:
-    - id: identity-verified
-      name: Identity Verification Complete
-      description: >
-        Confirm that the applicant's identity has been successfully verified
-        against two independent sources before credit assessment begins.
-      checkpoint_type: approve
-      required: true
-      who_reviews: Automated — passes automatically on dual-source match; escalates on failure
-      sla_hours: 1
+  # --- auto: agent proceeds without human involvement ---
 
-    - id: creditworthiness-assessment-review
-      name: Creditworthiness Assessment Review
-      description: >
-        Human underwriter reviews the agent's structured recommendation report,
-        including credit score, debt-to-income ratio, and supporting documentation.
-      checkpoint_type: approve
-      required: true
-      who_reviews: Qualified underwriter (minimum Grade 3 accreditation)
-      sla_hours: 24
+  - id: identity-verified
+    name: Identity Verification Complete
+    description: >
+      Confirms that the applicant's identity has been successfully verified
+      against two independent sources. The agent proceeds automatically on a
+      confirmed dual-source match; the identity-verification-failure control
+      point halts processing if verification cannot be completed.
+    classification: auto
 
-    - id: decision-communication
-      name: Lending Decision Communication
-      description: >
-        After underwriter approval, notify applicant of the lending decision
-        via templated email. Declined applications must include a reason code
-        for the customer to request a manual review.
-      checkpoint_type: notify
-      required: true
-      who_reviews: Underwriter (approved the decision)
+  # --- needs_approval: explicit human sign-off required before agent continues ---
 
-  condition_triggered_checkpoints:
-    - id: borderline-credit-score
-      name: Borderline Credit Score — Senior Review
-      trigger_condition: >
-        Applicant credit score falls within the borderline band (580–640)
-        as defined in the current underwriting policy.
-      description: >
-        Applications with borderline credit scores require review by a senior
-        underwriter to ensure consistent application of lending policy.
-      checkpoint_type: review
-      who_reviews: Senior underwriter (Grade 5+)
-      sla_hours: 48
+  - id: creditworthiness-assessment-review
+    name: Creditworthiness Assessment Review
+    description: >
+      Human underwriter reviews the agent's structured recommendation report,
+      including credit score, debt-to-income ratio, and supporting documentation,
+      and provides explicit sign-off before any decision is communicated.
+    classification: needs_approval
+    who_reviews: Qualified underwriter (minimum Grade 3 accreditation)
+    sla_hours: 24
 
-    - id: high-value-application
-      name: High-Value Loan Application Review
-      trigger_condition: Requested loan amount exceeds £50,000.
-      description: >
-        Loan applications above the high-value threshold require dual-approval:
-        both a qualified underwriter and the Head of Consumer Credit must sign off.
-      checkpoint_type: approve
-      who_reviews: Underwriter + Head of Consumer Credit
-      sla_hours: 48
+  - id: high-value-application
+    name: High-Value Loan Application Review
+    description: >
+      Loan applications above the high-value threshold require dual-approval:
+      both a qualified underwriter and the Head of Consumer Credit must sign off
+      before a decision is communicated to the applicant.
+    classification: needs_approval
+    trigger_condition: Requested loan amount exceeds £50,000.
+    who_reviews: Underwriter + Head of Consumer Credit
+    sla_hours: 48
 
-    - id: suspected-fraud-indicators
-      name: Fraud Indicators Detected
-      trigger_condition: >
-        Two or more fraud indicator flags are raised during document verification
-        (e.g. inconsistent employment records, mismatched address history, altered document metadata).
-      description: >
-        Halt processing and refer the application to the Financial Crime team
-        for manual investigation before any further action is taken.
-      checkpoint_type: halt
-      who_reviews: Financial Crime Investigation Team
-      sla_hours: 4
+  - id: suspected-fraud-indicators
+    name: Fraud Indicators Detected
+    description: >
+      Two or more fraud indicator flags have been raised during document
+      verification. Processing halts and the application is referred to the
+      Financial Crime team for manual investigation before any further action.
+    classification: needs_approval
+    trigger_condition: >
+      Two or more fraud indicator flags are raised during document verification
+      (e.g. inconsistent employment records, mismatched address history, altered document metadata).
+    who_reviews: Financial Crime Investigation Team
+    sla_hours: 4
+
+  # --- notify: human is informed but not blocked ---
+
+  - id: decision-communication
+    name: Lending Decision Communication
+    description: >
+      After underwriter approval, notifies the applicant of the lending decision
+      via templated email. Declined applications include a reason code so the
+      customer can request a manual review.
+    classification: notify
+    who_reviews: Underwriter (approved the decision)
+
+  # --- review: human reviews and can flag issues before agent continues ---
+
+  - id: borderline-credit-score
+    name: Borderline Credit Score — Senior Review
+    description: >
+      Applications with borderline credit scores require review by a senior
+      underwriter to ensure consistent application of lending policy before
+      the recommendation is finalised.
+    classification: review
+    trigger_condition: >
+      Applicant credit score falls within the borderline band (580–640)
+      as defined in the current underwriting policy.
+    who_reviews: Senior underwriter (Grade 5+)
+    sla_hours: 48
 
 workflow:
   steps:
     - id: retrieve-documents
       activity: "Retrieve and parse submitted application documents (proof of income, ID)"
-      veto_trigger: data-quality-critical
-      checkpoint: identity-verified
+      control_point: identity-verified
 
     - id: log-documents-retrieved
       activity: "Log all actions and data accesses to the audit trail"
 
     - id: sanctions-screening
       activity: "Cross-reference applicant details against the sanctions screening database"
-      veto_trigger: sanctions-match
 
     - id: log-sanctions-complete
       activity: "Log all actions and data accesses to the audit trail"
 
     - id: credit-score
       activity: "Query the internal credit scoring system for the applicant's risk score"
-      veto_trigger: protected-characteristic-detected
 
     - id: log-credit-retrieved
       activity: "Log all actions and data accesses to the audit trail"
@@ -195,11 +220,11 @@ workflow:
 
     - id: generate-recommendation
       activity: "Generate a structured recommendation report for the human underwriter"
-      checkpoint: creditworthiness-assessment-review
+      control_point: creditworthiness-assessment-review
 
     - id: log-recommendation-generated
       activity: "Log all actions and data accesses to the audit trail"
 
     - id: notify-applicant-decision
       activity: "Send templated acknowledgement and status-update emails to the applicant"
-      checkpoint: decision-communication
+      control_point: decision-communication

@@ -2,15 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://supervisory-procedures/schema/skill.schema.json",
   "title": "Agent Skill",
-  "description": "Supervisory Procedures — Agent Skill definition schema v1.1",
+  "description": "Supervisory Procedures — Agent Skill definition schema v2.0",
   "type": "object",
   "required": [
     "metadata",
     "context",
     "scope",
     "constraints",
-    "hard_veto_triggers",
-    "oversight_checkpoints",
+    "control_points",
     "workflow"
   ],
   "additionalProperties": false,
@@ -49,7 +48,7 @@
         },
         "schema_version": {
           "type": "string",
-          "enum": ["1.0", "1.1"],
+          "enum": ["2.0"],
           "description": "Hub-controlled schema version"
         },
         "business_area": {
@@ -168,118 +167,56 @@
       }
     },
 
-    "hard_veto_triggers": {
+    "control_points": {
       "type": "array",
       "minItems": 1,
+      "description": "Unified set of control points governing agent oversight. Each control point declares the level of human involvement required and when it activates.",
       "items": {
         "type": "object",
-        "required": ["id", "description", "action"],
+        "required": ["id", "name", "description", "classification"],
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string",
             "pattern": "^[a-z0-9_-]+$",
-            "description": "Slug identifier, e.g. sanctions-hit"
+            "description": "Slug identifier, e.g. sanctions-match"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
           },
           "description": {
             "type": "string",
             "minLength": 1,
-            "description": "Plain English description of the trigger condition"
+            "description": "Plain English description of what this control point represents and what action is taken."
+          },
+          "classification": {
+            "type": "string",
+            "enum": ["auto", "notify", "review", "needs_approval", "vetoed"],
+            "description": "auto: agent proceeds without human involvement. notify: a human is informed but not blocked. review: a human actively reviews and can flag issues before the agent continues. needs_approval: explicit human sign-off is required before the agent continues. vetoed: the agent halts immediately and unconditionally; no human override is possible."
+          },
+          "trigger_condition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain English condition that activates this control point. If present, the control point fires automatically when the condition is met. If absent, it must be referenced from a workflow step via the control_point field."
           },
           "condition_hint": {
             "type": "string",
-            "description": "Optional technical hint for agent developers"
+            "description": "Optional technical hint for agent developers, e.g. field expressions or pseudocode."
           },
-          "action": {
+          "who_reviews": {
             "type": "string",
-            "enum": [
-              "halt_and_escalate",
-              "halt_and_notify",
-              "halt_and_refuse"
-            ]
+            "minLength": 1,
+            "description": "Role or team responsible for review. Expected for notify, review, and needs_approval classifications."
           },
           "escalation_contact": {
             "type": "string",
-            "description": "Optional contact for escalation"
-          }
-        }
-      }
-    },
-
-    "oversight_checkpoints": {
-      "type": "object",
-      "required": ["workflow_checkpoints", "condition_triggered_checkpoints"],
-      "additionalProperties": false,
-      "properties": {
-        "workflow_checkpoints": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": [
-              "id",
-              "name",
-              "description",
-              "checkpoint_type",
-              "required",
-              "who_reviews"
-            ],
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "string",
-                "pattern": "^[a-z0-9_-]+$"
-              },
-              "name": { "type": "string", "minLength": 1 },
-              "description": { "type": "string", "minLength": 1 },
-              "checkpoint_type": {
-                "type": "string",
-                "enum": ["review", "approve", "notify", "halt"]
-              },
-              "required": { "type": "boolean" },
-              "who_reviews": { "type": "string", "minLength": 1 },
-              "sla_hours": {
-                "type": "integer",
-                "minimum": 1,
-                "description": "Optional SLA in hours"
-              }
-            }
-          }
-        },
-        "condition_triggered_checkpoints": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": [
-              "id",
-              "name",
-              "trigger_condition",
-              "description",
-              "checkpoint_type",
-              "who_reviews"
-            ],
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "string",
-                "pattern": "^[a-z0-9_-]+$"
-              },
-              "name": { "type": "string", "minLength": 1 },
-              "trigger_condition": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Plain English description of what triggers this checkpoint"
-              },
-              "description": { "type": "string", "minLength": 1 },
-              "checkpoint_type": {
-                "type": "string",
-                "enum": ["review", "approve", "notify", "halt"]
-              },
-              "who_reviews": { "type": "string", "minLength": 1 },
-              "sla_hours": {
-                "type": "integer",
-                "minimum": 1
-              }
-            }
+            "description": "Contact for escalation or notification. Most relevant for vetoed classification."
+          },
+          "sla_hours": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optional time limit in hours for the human action."
           }
         }
       }
@@ -310,15 +247,10 @@
                 "minLength": 1,
                 "description": "Must match exactly one entry in scope.approved_activities."
               },
-              "veto_trigger": {
+              "control_point": {
                 "type": "string",
                 "pattern": "^[a-z0-9_-]+$",
-                "description": "ID of a hard_veto_trigger to evaluate after this step completes."
-              },
-              "checkpoint": {
-                "type": "string",
-                "pattern": "^[a-z0-9_-]+$",
-                "description": "ID of an oversight_checkpoint that gates progression to the next step."
+                "description": "ID of a control_point (without trigger_condition) that gates progression after this step completes."
               },
               "uses_skill": {
                 "type": "string",

@@ -105,8 +105,7 @@ class TestSkillRegistryGetSkill:
         assert "context" in skill
         assert "scope" in skill
         assert "constraints" in skill
-        assert "hard_veto_triggers" in skill
-        assert "oversight_checkpoints" in skill
+        assert "control_points" in skill
 
 
 class TestSkillRegistryListSkills:

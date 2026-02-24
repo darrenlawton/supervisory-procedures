@@ -122,7 +122,7 @@ class TestSchemaConstraints:
             validate_skill(path)
 
     def test_invalid_schema_version_rejected(self, tmp_path):
-        skill = self._make_skill({"metadata": {"schema_version": "2.0"}})
+        skill = self._make_skill({"metadata": {"schema_version": "99.0"}})
         path = tmp_path / "skill.yml"
         path.write_text(yaml.dump(skill))
         with pytest.raises(ValidationError):
@@ -135,16 +135,16 @@ class TestSchemaConstraints:
         with pytest.raises(ValidationError):
             validate_skill(path)
 
-    def test_empty_veto_triggers_rejected(self, tmp_path):
-        skill = self._make_skill({"hard_veto_triggers": []})
+    def test_empty_control_points_rejected(self, tmp_path):
+        skill = self._make_skill({"control_points": []})
         path = tmp_path / "skill.yml"
         path.write_text(yaml.dump(skill))
         with pytest.raises(ValidationError):
             validate_skill(path)
 
-    def test_invalid_veto_action_rejected(self, tmp_path):
+    def test_invalid_classification_rejected(self, tmp_path):
         skill = self._make_skill({
-            "hard_veto_triggers": [{"id": "test", "description": "test", "action": "do_nothing"}]
+            "control_points": [{"id": "test", "name": "Test", "description": "test", "classification": "do_nothing"}]
         })
         path = tmp_path / "skill.yml"
         path.write_text(yaml.dump(skill))

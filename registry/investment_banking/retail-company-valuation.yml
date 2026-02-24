@@ -1,8 +1,8 @@
 metadata:
   id: investment_banking/retail-company-valuation
   name: Retail Company Valuation Model
-  version: 1.0.0
-  schema_version: "1.1"
+  version: 2.0.0
+  schema_version: "2.0"
   business_area: investment_banking
   supervisor:
     name: Your Full Name
@@ -58,107 +58,119 @@ constraints:
     - Generate a final investment recommendation — the agent produces analysis only
     - Access deal team data rooms for companies outside the approved coverage list
 
-hard_veto_triggers:
+control_points:
+  # --- vetoed: agent halts unconditionally, no human override ---
+
   - id: inside-information-detected
+    name: Inside Information Detected
     description: >
       An input data source is flagged as potentially containing material
-      non-public information (MNPI) about the target company.
+      non-public information (MNPI) about the target company. Processing must
+      halt immediately and be escalated to the MNPI Compliance desk.
+    classification: vetoed
+    trigger_condition: >
+      An input data source is flagged as potentially containing material
+      non-public information (MNPI) about the target company, or originates
+      from a deal room.
     condition_hint: data_source.mnpi_flag == true OR data_source.origin == "deal_room"
-    action: halt_and_escalate
     escalation_contact: compliance-mnpi-desk@bank.example.com
 
   - id: target-on-restricted-list
+    name: Target on Restricted or Watch List
     description: >
       The target company appears on the firm's restricted or watch list,
-      indicating an active deal or conflict of interest.
+      indicating an active deal or conflict of interest. Processing must
+      halt immediately and be escalated to the Conflicts Office.
+    classification: vetoed
+    trigger_condition: >
+      The target company matches an entry on the firm's restricted or watch list.
     condition_hint: restricted_list_check.match == true
-    action: halt_and_escalate
     escalation_contact: conflicts-office@bank.example.com
 
   - id: data-source-not-approved
+    name: Unapproved Data Source
     description: >
-      The agent attempts to retrieve data from a vendor or source not on the
+      The agent has attempted to retrieve data from a vendor or source not on the
+      approved data vendor list. Processing must halt and the IB Data Governance
+      team must be notified.
+    classification: vetoed
+    trigger_condition: >
+      Agent attempts to retrieve data from a vendor or source not present on the
       approved data vendor list.
-    action: halt_and_notify
     escalation_contact: ib-data-governance@bank.example.com
 
-oversight_checkpoints:
-  workflow_checkpoints:
-    - id: restricted-list-cleared
-      name: Restricted List Check Complete
-      description: >
-        Confirm target company is not on the restricted or watch list
-        before any data retrieval or modelling begins.
-      checkpoint_type: approve
-      required: true
-      who_reviews: Compliance — Conflicts Office
-      sla_hours: 2
+  # --- needs_approval: explicit human sign-off required before agent continues ---
 
-    - id: valuation-senior-review
-      name: Senior Banker Valuation Review
-      description: >
-        Senior banker reviews the agent's draft valuation output, including
-        methodology, comparable selection, and DCF assumptions, before
-        any client use.
-      checkpoint_type: approve
-      required: true
-      who_reviews: VP or MD — Investment Banking Coverage
-      sla_hours: 24
+  - id: restricted-list-cleared
+    name: Restricted List Check Complete
+    description: >
+      Compliance confirms the target company is not on the restricted or watch list
+      before any data retrieval or modelling begins.
+    classification: needs_approval
+    who_reviews: Compliance — Conflicts Office
+    sla_hours: 2
 
-    - id: external-sharing-approval
-      name: External Distribution Sign-off
-      description: >
-        Coverage MD explicitly approves sharing the valuation model or
-        summary with any external party.
-      checkpoint_type: approve
-      required: true
-      who_reviews: Coverage Managing Director
-      sla_hours: 4
+  - id: valuation-senior-review
+    name: Senior Banker Valuation Review
+    description: >
+      Senior banker reviews the agent's draft valuation output, including
+      methodology, comparable selection, and DCF assumptions, and provides
+      explicit sign-off before any client use.
+    classification: needs_approval
+    who_reviews: VP or MD — Investment Banking Coverage
+    sla_hours: 24
 
-  condition_triggered_checkpoints:
-    - id: data-anomaly-flagged
-      name: Financial Data Anomaly Review
-      trigger_condition: >
-        Agent flags a material inconsistency or anomaly in source financials
-        (e.g. restatement, non-recurring items exceeding 10% of EBITDA).
-      description: >
-        Analyst must acknowledge and document the anomaly before the model
-        proceeds. Agent output must note the anomaly in the final report.
-      checkpoint_type: review
-      who_reviews: Analyst or Associate — Investment Banking Coverage
-      sla_hours: 4
+  - id: external-sharing-approval
+    name: External Distribution Sign-off
+    description: >
+      Coverage MD explicitly approves sharing the valuation model or summary
+      with any external party.
+    classification: needs_approval
+    who_reviews: Coverage Managing Director
+    sla_hours: 4
 
-    - id: private-company-target
-      name: Private Company — Enhanced Data Governance Review
-      trigger_condition: Target company is not publicly listed.
-      description: >
-        Private company valuations rely on non-public financial data subject
-        to NDA. Legal and compliance must confirm data usage is permissible
-        before modelling proceeds.
-      checkpoint_type: approve
-      who_reviews: Legal Counsel + Compliance
-      sla_hours: 48
+  - id: private-company-target
+    name: Private Company — Enhanced Data Governance Review
+    description: >
+      Private company valuations rely on non-public financial data subject
+      to NDA. Legal and compliance must confirm data usage is permissible
+      before modelling proceeds.
+    classification: needs_approval
+    trigger_condition: Target company is not publicly listed.
+    who_reviews: Legal Counsel + Compliance
+    sla_hours: 48
+
+  # --- review: human reviews and can flag issues before agent continues ---
+
+  - id: data-anomaly-flagged
+    name: Financial Data Anomaly Review
+    description: >
+      Analyst must acknowledge and document the anomaly before the model
+      proceeds. Agent output must note the anomaly in the final report.
+    classification: review
+    trigger_condition: >
+      Agent flags a material inconsistency or anomaly in source financials
+      (e.g. restatement, non-recurring items exceeding 10% of EBITDA).
+    who_reviews: Analyst or Associate — Investment Banking Coverage
+    sla_hours: 4
 
 workflow:
   steps:
     - id: restricted-list-check
       activity: "Check the target company against the firm's restricted and watch lists prior to any data retrieval"
-      veto_trigger: target-on-restricted-list
-      checkpoint: restricted-list-cleared
+      control_point: restricted-list-cleared
 
     - id: log-list-check
       activity: "Log all data sources, versions, and assumptions to the audit trail"
 
     - id: retrieve-public-filings
       activity: "Retrieve public financial filings (10-K, 20-F, annual reports) for target and comparable companies"
-      veto_trigger: data-source-not-approved
 
     - id: log-filings-retrieved
       activity: "Log all data sources, versions, and assumptions to the audit trail"
 
     - id: pull-market-data
       activity: "Pull approved market data feeds for share price, EV, and trading multiples"
-      veto_trigger: data-source-not-approved
 
     - id: log-market-data-retrieved
       activity: "Log all data sources, versions, and assumptions to the audit trail"
@@ -171,7 +183,6 @@ workflow:
 
     - id: build-dcf-inputs
       activity: "Build DCF model inputs using normalised historical financials and published consensus forecasts"
-      veto_trigger: inside-information-detected
 
     - id: log-dcf-built
       activity: "Log all data sources, versions, and assumptions to the audit trail"
@@ -187,14 +198,14 @@ workflow:
 
     - id: generate-valuation-report
       activity: "Generate a structured valuation summary report for senior banker review"
-      checkpoint: valuation-senior-review
+      control_point: valuation-senior-review
 
     - id: log-report-generated
       activity: "Log all data sources, versions, and assumptions to the audit trail"
 
     - id: deliver-model
       activity: "Package and deliver the approved valuation model to authorised recipients"
-      checkpoint: external-sharing-approval
+      control_point: external-sharing-approval
 
     - id: log-delivery
       activity: "Log all data sources, versions, and assumptions to the audit trail"
