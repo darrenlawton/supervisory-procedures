@@ -4,6 +4,7 @@ metadata:
   version: 2.0.0
   schema_version: "2.0"
   business_area: financial_crime_compliance
+  type: standard
   supervisor:
     name: Head of Financial Crime Compliance
     email: financial-crime-compliance@bank.example.com
@@ -274,3 +275,22 @@ workflow:
 
     - id: log-audit
       activity: "Log all data accesses, sources queried, reasoning steps, and recommended actions to the immutable audit trail"
+
+helper_skills:
+  - id: shared/audit-logging
+    purpose: >
+      Writes an immutable, timestamped audit trail entry for every data source
+      queried and every decision step taken, satisfying BSA/AML and FATF audit
+      requirements and the Fed/OCC SR 11-7 model risk governance framework.
+    required: true
+  - id: shared/checkpoint-gate
+    purpose: >
+      Enforces the four-eyes principle: agent halts at evidence-package-review
+      and final-disposition-approval checkpoints, and immediately escalates on
+      any vetoed control point (exact match, low confidence, active investigation).
+    required: true
+  - id: shared/validate-activity
+    purpose: >
+      Enforces the approved_activities scope boundary before every agent action,
+      preventing out-of-scope data access or processing.
+    required: true

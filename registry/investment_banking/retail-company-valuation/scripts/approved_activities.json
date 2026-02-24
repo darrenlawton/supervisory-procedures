@@ -1,0 +1,12 @@
+[
+  "check_restricted_list",
+  "retrieve_public_filings",
+  "pull_market_data",
+  "calculate_trading_multiples",
+  "build_dcf_inputs",
+  "construct_lbo_skeleton",
+  "flag_data_anomalies",
+  "generate_valuation_report",
+  "deliver_model",
+  "write_audit_log_entry"
+]

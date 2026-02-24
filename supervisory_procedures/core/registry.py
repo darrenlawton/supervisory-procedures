@@ -46,6 +46,10 @@ class SkillRegistry:
     def load(self, force_reload: bool = False) -> None:
         """Scan the registry directory and populate the cache.
 
+        Loading is done in two passes so that directory-based skills
+        (skill.yml inside a named directory) take precedence over flat
+        legacy .yml files when both define the same skill ID.
+
         Invalid skill files are skipped with a warning; they do not prevent
         other skills from loading.
         """
@@ -53,22 +57,34 @@ class SkillRegistry:
             return
 
         self._cache.clear()
-        yml_files = sorted(self._registry_path.rglob("*.yml"))
 
-        for path in yml_files:
-            try:
-                validate_skill(path)
-                data = load_yaml(path)
-                skill_id: str = data["metadata"]["id"]
-                self._cache[skill_id] = data
-                logger.debug("Loaded skill %s from %s", skill_id, path)
-            except ValidationError as exc:
-                logger.warning("Skipping invalid skill %s: %s", path, exc)
-            except (KeyError, ValueError) as exc:
-                logger.warning("Skipping malformed skill %s: %s", path, exc)
+        # Pass 1: flat legacy skills (any *.yml not named skill.yml)
+        for path in sorted(self._registry_path.rglob("*.yml")):
+            if path.name == "skill.yml":
+                continue
+            self._load_skill_file(path, skill_dir=None)
+
+        # Pass 2: directory-based skills (skill.yml files) — wins on duplicate ID
+        for path in sorted(self._registry_path.rglob("skill.yml")):
+            self._load_skill_file(path, skill_dir=path.parent)
 
         self._loaded = True
         logger.info("Registry loaded: %d valid skills", len(self._cache))
+
+    def _load_skill_file(self, path: Path, skill_dir: Path | None) -> None:
+        """Validate and load a single skill file into the cache."""
+        try:
+            validate_skill(path)
+            data = load_yaml(path)
+            skill_id: str = data["metadata"]["id"]
+            if skill_dir is not None:
+                data["_skill_dir"] = str(skill_dir)
+            self._cache[skill_id] = data
+            logger.debug("Loaded skill %s from %s", skill_id, path)
+        except ValidationError as exc:
+            logger.warning("Skipping invalid skill %s: %s", path, exc)
+        except (KeyError, ValueError) as exc:
+            logger.warning("Skipping malformed skill %s: %s", path, exc)
 
     def get_skill(
         self,

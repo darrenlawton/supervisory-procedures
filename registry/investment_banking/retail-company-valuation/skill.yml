@@ -4,6 +4,7 @@ metadata:
   version: 2.0.0
   schema_version: "2.0"
   business_area: investment_banking
+  type: standard
   supervisor:
     name: Your Full Name
     email: your.name@bank.example.com
@@ -209,3 +210,22 @@ workflow:
 
     - id: log-delivery
       activity: "Log all data sources, versions, and assumptions to the audit trail"
+
+helper_skills:
+  - id: shared/audit-logging
+    purpose: >
+      Records every data source retrieved, model input used, and workflow
+      transition to the audit trail, satisfying FCA MAR and MiFID II
+      record-keeping obligations.
+    required: true
+  - id: shared/checkpoint-gate
+    purpose: >
+      Enforces restricted-list clearance, senior banker review, and Coverage MD
+      external-sharing approval; halts unconditionally on MNPI or restricted-list
+      veto triggers.
+    required: true
+  - id: shared/validate-activity
+    purpose: >
+      Verifies every proposed agent action against the approved_activities
+      allowlist before execution, enforcing scope boundaries at runtime.
+    required: true

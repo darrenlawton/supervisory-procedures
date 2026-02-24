@@ -111,14 +111,28 @@ def validate_directory(
     directory: Path,
     strict: bool = False,
 ) -> tuple[list[tuple[Path, list[ValidationWarning]]], list[ValidationError]]:
-    """Validate all *.yml files under directory recursively.
+    """Validate skill YAML files under directory recursively.
+
+    Directory-based skills (skill.yml inside a named directory) take
+    precedence: when a directory contains skill.yml, any other *.yml files
+    in that same directory are skipped (they are treated as non-skill files).
 
     Returns:
         (successes, failures)
         successes: list of (path, warnings) for valid skills
         failures: list of ValidationError for invalid skills
     """
-    yml_files = sorted(directory.rglob("*.yml"))
+    # Directories that own a skill.yml — other .yml files there are non-skill
+    skill_yml_dirs: set[Path] = {
+        p.parent for p in directory.rglob("skill.yml")
+    }
+
+    yml_files: list[Path] = []
+    for path in sorted(directory.rglob("*.yml")):
+        if path.name != "skill.yml" and path.parent in skill_yml_dirs:
+            continue  # skip non-skill .yml files alongside a skill.yml
+        yml_files.append(path)
+
     successes: list[tuple[Path, list[ValidationWarning]]] = []
     failures: list[ValidationError] = []
 

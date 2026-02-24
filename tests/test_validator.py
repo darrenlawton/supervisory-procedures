@@ -48,7 +48,7 @@ class TestValidateSkill:
 
     def test_loan_application_processing_valid(self):
         registry = Path(__file__).parent.parent / "registry"
-        skill_path = registry / "retail_banking" / "loan_application_processing.yml"
+        skill_path = registry / "retail_banking" / "loan-application-processing" / "skill.yml"
         warnings = validate_skill(skill_path)
         assert isinstance(warnings, list)
 

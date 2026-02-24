@@ -4,6 +4,7 @@ metadata:
   version: 2.0.0
   schema_version: "2.0"
   business_area: retail_banking
+  type: standard
   supervisor:
     name: Sarah Johnson
     email: sarah.johnson@bank.example.com
@@ -228,3 +229,20 @@ workflow:
     - id: notify-applicant-decision
       activity: "Send templated acknowledgement and status-update emails to the applicant"
       control_point: decision-communication
+
+helper_skills:
+  - id: shared/audit-logging
+    purpose: >
+      Writes timestamped audit trail entries at every data access and workflow
+      transition, satisfying the ICO UK GDPR Article 22 and FCA audit requirements.
+    required: true
+  - id: shared/checkpoint-gate
+    purpose: >
+      Enforces human underwriter review checkpoints and vetoed escalations
+      (sanctions match, identity failure, protected characteristics) at runtime.
+    required: true
+  - id: shared/validate-activity
+    purpose: >
+      Verifies every proposed agent action against the approved_activities
+      allowlist before execution, enforcing scope boundaries at runtime.
+    required: true
