@@ -43,7 +43,6 @@ If `"allowed": false` — halt immediately and log the attempt.
 | `calculate-dti` | Calculate debt-to-income ratio using declared and verified income figures |
 | `generate-recommendation` | Generate a structured recommendation report for the human underwriter |
 | `send-notification` | Send templated acknowledgement and status-update emails to the applicant |
-| `audit-log` | Log all actions and data accesses to the audit trail |
 
 ---
 ## What You Must Never Do
@@ -257,22 +256,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
   --classification auto
 ```
 
-### Step 2 — log-documents-retrieved
-
-**Activity:** Log all actions and data accesses to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/retail_banking/loan-application-processing/skill.yml \
-  --step log-documents-retrieved
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill retail_banking/loan-application-processing \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-documents-retrieved
-```
-
-### Step 3 — sanctions-screening
+### Step 2 — sanctions-screening
 
 **Activity:** Cross-reference applicant details against the sanctions screening database
 
@@ -287,22 +271,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action sanctions-screening
 ```
 
-### Step 4 — log-sanctions-complete
-
-**Activity:** Log all actions and data accesses to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/retail_banking/loan-application-processing/skill.yml \
-  --step log-sanctions-complete
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill retail_banking/loan-application-processing \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-sanctions-complete
-```
-
-### Step 5 — credit-score
+### Step 3 — credit-score
 
 **Activity:** Query the internal credit scoring system for the applicant's risk score
 
@@ -317,22 +286,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action credit-score
 ```
 
-### Step 6 — log-credit-retrieved
-
-**Activity:** Log all actions and data accesses to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/retail_banking/loan-application-processing/skill.yml \
-  --step log-credit-retrieved
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill retail_banking/loan-application-processing \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-credit-retrieved
-```
-
-### Step 7 — calculate-dti
+### Step 4 — calculate-dti
 
 **Activity:** Calculate debt-to-income ratio using declared and verified income figures
 
@@ -347,22 +301,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action calculate-dti
 ```
 
-### Step 8 — log-dti-calculated
-
-**Activity:** Log all actions and data accesses to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/retail_banking/loan-application-processing/skill.yml \
-  --step log-dti-calculated
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill retail_banking/loan-application-processing \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-dti-calculated
-```
-
-### Step 9 — send-progress-notification
+### Step 5 — send-progress-notification
 
 **Activity:** Send templated acknowledgement and status-update emails to the applicant
 
@@ -377,7 +316,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action send-progress-notification
 ```
 
-### Step 10 — generate-recommendation
+### Step 6 — generate-recommendation
 
 **Activity:** Generate a structured recommendation report for the human underwriter
 
@@ -405,22 +344,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### Step 11 — log-recommendation-generated
-
-**Activity:** Log all actions and data accesses to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/retail_banking/loan-application-processing/skill.yml \
-  --step log-recommendation-generated
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill retail_banking/loan-application-processing \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-recommendation-generated
-```
-
-### Step 12 — notify-applicant-decision
+### Step 7 — notify-applicant-decision
 
 **Activity:** Send templated acknowledgement and status-update emails to the applicant
 

@@ -47,8 +47,6 @@ scope:
       description: Generate a structured recommendation report for the human underwriter
     - id: send-notification
       description: Send templated acknowledgement and status-update emails to the applicant
-    - id: audit-log
-      description: Log all actions and data accesses to the audit trail
 
 constraints:
   procedural_requirements:
@@ -198,26 +196,14 @@ workflow:
       activity: retrieve-documents
       control_point: identity-verified
 
-    - id: log-documents-retrieved
-      activity: audit-log
-
     - id: sanctions-screening
       activity: sanctions-screening
-
-    - id: log-sanctions-complete
-      activity: audit-log
 
     - id: credit-score
       activity: credit-score
 
-    - id: log-credit-retrieved
-      activity: audit-log
-
     - id: calculate-dti
       activity: calculate-dti
-
-    - id: log-dti-calculated
-      activity: audit-log
 
     - id: send-progress-notification
       activity: send-notification
@@ -225,9 +211,6 @@ workflow:
     - id: generate-recommendation
       activity: generate-recommendation
       control_point: creditworthiness-assessment-review
-
-    - id: log-recommendation-generated
-      activity: audit-log
 
     - id: notify-applicant-decision
       activity: send-notification
