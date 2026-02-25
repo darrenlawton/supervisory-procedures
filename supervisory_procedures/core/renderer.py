@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 _SHARED = "registry/shared"
@@ -49,6 +50,13 @@ def _inline(text: str) -> str:
     return " ".join(text.split())
 
 
+def _cp_display_name(cp: dict[str, Any]) -> str:
+    """Return display name for a control point: explicit name or title-cased id."""
+    if cp.get("name"):
+        return cp["name"]
+    return re.sub(r"-", " ", cp["id"]).title()
+
+
 def _checkpoint_gate_cmd(skill_id: str, cp: dict[str, Any]) -> str:
     """Build a checkpoint_gate.py bash invocation from a control point dict."""
     args = [
@@ -91,6 +99,11 @@ def _halt_comment(classification: str) -> str:
         "review": "# PENDING — halt here and await reviewer clearance before continuing.",
         "notify": "# NOTIFY — human is informed; agent may continue.",
     }.get(classification, "")
+
+
+def _effective_step_id(step: dict[str, Any]) -> str:
+    """Return the effective step ID — explicit id if present, else the activity id."""
+    return step.get("id") or step.get("activity", "?")
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +162,7 @@ def _initialisation(skill_data: dict[str, Any]) -> str:
 
 def _approved_activities(skill_data: dict[str, Any]) -> str:
     syml = _skill_yml_path(skill_data)
-    activities = skill_data.get("scope", {}).get("approved_activities", [])
+    activities = skill_data.get("approved_activities", [])
 
     validate_cmd = (
         f"python {_SHARED}/validate-activity/scripts/validate_activity.py \\\n"
@@ -197,11 +210,9 @@ def _vetoed_conditions(skill_data: dict[str, Any]) -> str:
 
     for cp in vetoed:
         cmd = _checkpoint_gate_cmd(sid, cp)
-        lines += [f"### {cp['id']} — {cp.get('name', '')}", "", _inline(cp.get("description", ""))]
-        if cp.get("trigger_condition"):
-            lines += ["", f"**Trigger:** {_inline(cp['trigger_condition'])}"]
-        if cp.get("condition_hint"):
-            lines += [f"**Condition hint:** `{_inline(cp['condition_hint'])}`"]
+        lines += [f"### {cp['id']} — {_cp_display_name(cp)}", "", _inline(cp.get("description", ""))]
+        if cp.get("trigger"):
+            lines += ["", f"**Trigger:** {_inline(cp['trigger'])}"]
         lines += ["", f"```bash\n{cmd}\n{_halt_comment('vetoed')}\n```", ""]
 
     lines.append("---")
@@ -209,12 +220,12 @@ def _vetoed_conditions(skill_data: dict[str, Any]) -> str:
 
 
 def _oversight_checkpoints(skill_data: dict[str, Any]) -> str:
-    """Non-vetoed control points WITHOUT trigger_condition (referenced from workflow steps)."""
+    """Control points with activation: step (referenced from workflow steps)."""
     sid = _skill_id(skill_data)
     checkpoints = [
         cp for cp in skill_data.get("control_points", [])
         if cp.get("classification") not in ("vetoed", "auto")
-        and not cp.get("trigger_condition")
+        and cp.get("activation") == "step"
     ]
     if not checkpoints:
         return ""
@@ -239,7 +250,7 @@ def _oversight_checkpoints(skill_data: dict[str, Any]) -> str:
         bash = f"```bash\n{cmd}\n{comment}\n```" if comment else f"```bash\n{cmd}\n```"
 
         lines += [
-            f"### {cp['id']} — {cp.get('name', '')}",
+            f"### {cp['id']} — {_cp_display_name(cp)}",
             "",
             " | ".join(meta_parts),
             "",
@@ -254,12 +265,12 @@ def _oversight_checkpoints(skill_data: dict[str, Any]) -> str:
 
 
 def _condition_triggered_controls(skill_data: dict[str, Any]) -> str:
-    """Non-vetoed control points WITH trigger_condition."""
+    """Control points with activation: conditional."""
     sid = _skill_id(skill_data)
     checkpoints = [
         cp for cp in skill_data.get("control_points", [])
         if cp.get("classification") not in ("vetoed", "auto")
-        and cp.get("trigger_condition")
+        and cp.get("activation") == "conditional"
     ]
     if not checkpoints:
         return ""
@@ -284,11 +295,11 @@ def _condition_triggered_controls(skill_data: dict[str, Any]) -> str:
         bash = f"```bash\n{cmd}\n{comment}\n```" if comment else f"```bash\n{cmd}\n```"
 
         lines += [
-            f"### {cp['id']} — {cp.get('name', '')}",
+            f"### {cp['id']} — {_cp_display_name(cp)}",
             "",
             " | ".join(meta_parts),
             "",
-            f"**Trigger:** {_inline(cp['trigger_condition'])}",
+            f"**Trigger:** {_inline(cp['trigger'])}",
             "",
             _inline(cp.get("description", "")),
             "",
@@ -307,7 +318,7 @@ def _workflow(skill_data: dict[str, Any]) -> str:
     cp_idx = _cp_index(skill_data)
     activity_map = {
         a["id"]: a["description"]
-        for a in skill_data.get("scope", {}).get("approved_activities", [])
+        for a in skill_data.get("approved_activities", [])
     }
 
     if not steps:
@@ -321,7 +332,7 @@ def _workflow(skill_data: dict[str, Any]) -> str:
     ]
 
     for i, step in enumerate(steps, 1):
-        step_id = step["id"]
+        step_id = _effective_step_id(step)
         activity_id = step.get("activity", "")
         activity = activity_map.get(activity_id, activity_id)
         cp_ref = step.get("control_point")

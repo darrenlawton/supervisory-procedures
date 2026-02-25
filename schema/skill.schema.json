@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://supervisory-procedures/schema/skill.schema.json",
   "title": "Agent Skill",
-  "description": "Supervisory Procedures — Agent Skill definition schema v2.0",
+  "description": "Supervisory Procedures — Agent Skill definition schema v2.1",
   "type": "object",
   "required": [
     "metadata",
     "context",
-    "scope",
+    "approved_activities",
     "constraints",
     "control_points",
     "workflow"
@@ -25,9 +25,6 @@
         "business_area",
         "supervisor",
         "status",
-        "created_at",
-        "approved_at",
-        "approved_by",
         "authorised_agents"
       ],
       "additionalProperties": false,
@@ -48,7 +45,7 @@
         },
         "schema_version": {
           "type": "string",
-          "enum": ["2.0"],
+          "enum": ["2.1"],
           "description": "Hub-controlled schema version"
         },
         "business_area": {
@@ -78,19 +75,21 @@
         "created_at": {
           "type": "string",
           "format": "date",
-          "description": "ISO 8601 date, e.g. 2024-01-15"
+          "description": "ISO 8601 date. Set automatically by tooling; not required from the author."
         },
         "approved_at": {
           "oneOf": [
             { "type": "string", "format": "date" },
             { "type": "null" }
-          ]
+          ],
+          "description": "Set by hub on approval. Not required from the author."
         },
         "approved_by": {
           "oneOf": [
             { "type": "string", "minLength": 1 },
             { "type": "null" }
-          ]
+          ],
+          "description": "Set by hub on approval. Not required from the author."
         },
         "authorised_agents": {
           "type": "array",
@@ -133,34 +132,27 @@
       }
     },
 
-    "scope": {
-      "type": "object",
-      "required": ["approved_activities"],
-      "additionalProperties": false,
-      "properties": {
-        "approved_activities": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["id", "description"],
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "string",
-                "pattern": "^[a-z0-9-]+$",
-                "description": "Slug identifier for this activity, e.g. audit-log"
-              },
-              "description": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Plain English description of what the agent does"
-              }
-            }
+    "approved_activities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Slug identifier for this activity, e.g. run-query"
           },
-          "minItems": 1,
-          "description": "Exhaustive list of what the agent MAY do. Each entry has an id and description. workflow.steps[].activity references an activity id."
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain English description of what the agent does"
+          }
         }
-      }
+      },
+      "minItems": 1,
+      "description": "Exhaustive list of what the agent MAY do. Each entry has an id and description. workflow.steps[].activity references an activity id. Audit logging is automatic — do not add an audit-log activity."
     },
 
     "constraints": {
@@ -189,8 +181,28 @@
       "description": "Unified set of control points governing agent oversight. Each control point declares the level of human involvement required and when it activates.",
       "items": {
         "type": "object",
-        "required": ["id", "name", "description", "classification"],
+        "required": ["id", "description", "classification", "activation"],
         "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": { "activation": { "const": "conditional" } }
+            },
+            "then": { "required": ["trigger"] }
+          },
+          {
+            "if": {
+              "properties": { "classification": { "enum": ["needs_approval", "review", "notify"] } }
+            },
+            "then": { "required": ["who_reviews"] }
+          },
+          {
+            "if": {
+              "properties": { "classification": { "const": "vetoed" } }
+            },
+            "then": { "required": ["escalation_contact"] }
+          }
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -199,7 +211,8 @@
           },
           "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Display name. If omitted, derived from id by converting slug to title case."
           },
           "description": {
             "type": "string",
@@ -211,23 +224,24 @@
             "enum": ["auto", "notify", "review", "needs_approval", "vetoed"],
             "description": "auto: agent proceeds without human involvement. notify: a human is informed but not blocked. review: a human actively reviews and can flag issues before the agent continues. needs_approval: explicit human sign-off is required before the agent continues. vetoed: the agent halts immediately and unconditionally; no human override is possible."
           },
-          "trigger_condition": {
+          "activation": {
+            "type": "string",
+            "enum": ["conditional", "step"],
+            "description": "conditional: fires when trigger condition is met during any workflow step. step: fires when explicitly referenced by a workflow step via the control_point field."
+          },
+          "trigger": {
             "type": "string",
             "minLength": 1,
-            "description": "Plain English condition that activates this control point. If present, the control point fires automatically when the condition is met. If absent, it must be referenced from a workflow step via the control_point field."
-          },
-          "condition_hint": {
-            "type": "string",
-            "description": "Optional technical hint for agent developers, e.g. field expressions or pseudocode."
+            "description": "Plain English condition that activates this control point. Required when activation is 'conditional'."
           },
           "who_reviews": {
             "type": "string",
             "minLength": 1,
-            "description": "Role or team responsible for review. Expected for notify, review, and needs_approval classifications."
+            "description": "Role or team responsible for review. Required for notify, review, and needs_approval classifications."
           },
           "escalation_contact": {
             "type": "string",
-            "description": "Contact for escalation or notification. Most relevant for vetoed classification."
+            "description": "Contact for escalation or notification. Required for vetoed classification."
           },
           "sla_hours": {
             "type": "integer",
@@ -250,23 +264,23 @@
           "description": "Each step maps 1:1 to an approved_activity. Steps are executed in order.",
           "items": {
             "type": "object",
-            "required": ["id", "activity"],
+            "required": ["activity"],
             "additionalProperties": false,
             "properties": {
               "id": {
                 "type": "string",
                 "pattern": "^[a-z0-9-]+$",
-                "description": "Unique slug identifier for this step within the workflow."
+                "description": "Unique slug identifier for this step. If omitted, defaults to the activity id."
               },
               "activity": {
                 "type": "string",
                 "pattern": "^[a-z0-9-]+$",
-                "description": "ID of an approved activity in scope.approved_activities."
+                "description": "ID of an approved activity in approved_activities."
               },
               "control_point": {
                 "type": "string",
                 "pattern": "^[a-z0-9_-]+$",
-                "description": "ID of a control_point (without trigger_condition) that gates progression after this step completes."
+                "description": "ID of a control_point (with activation: step) that gates progression after this step completes."
               },
               "uses_skill": {
                 "type": "string",
@@ -279,27 +293,36 @@
       }
     },
 
-    "helper_skills": {
-      "type": "array",
-      "description": "Centrally-maintained helper skills from registry/shared/ that this skill delegates to in its workflow.",
-      "items": {
-        "type": "object",
-        "required": ["id", "purpose"],
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^shared/[a-z0-9_-]+$",
-            "description": "Skill ID in the shared registry, e.g. shared/audit-logging."
-          },
-          "purpose": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Why this helper skill is used in this workflow."
-          },
-          "required": {
-            "type": "boolean",
-            "description": "Whether this helper skill is required for the workflow to execute."
+    "artifacts": {
+      "type": "object",
+      "description": "Optional declaration of supporting files in the skill directory. Makes the skill package explicit and enables validation of artifact consistency.",
+      "additionalProperties": false,
+      "properties": {
+        "resources": {
+          "type": "array",
+          "description": "Markdown resource files in the resources/ directory.",
+          "items": {
+            "type": "object",
+            "required": ["file", "description"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "type": "string", "minLength": 1, "description": "Filename within resources/" },
+              "description": { "type": "string", "minLength": 1, "description": "Purpose of this resource file" }
+            }
+          }
+        },
+        "scripts": {
+          "type": "array",
+          "description": "Python script files in the scripts/ directory.",
+          "items": {
+            "type": "object",
+            "required": ["file", "description"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "type": "string", "minLength": 1, "description": "Filename within scripts/" },
+              "description": { "type": "string", "minLength": 1, "description": "Purpose of this script" },
+              "used_by_activity": { "type": "string", "description": "Activity id that uses this script" }
+            }
           }
         }
       }

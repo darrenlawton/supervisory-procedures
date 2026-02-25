@@ -6,7 +6,7 @@ description: "AI-assisted construction of valuation models for publicly listed a
 # Retail Company Valuation Model
 
 > **Governed Skill** — Supervisor: Your Full Name (Head of Investment Banking Coverage — Retail)
-> Risk: **high** | Version: 2.0.0 | Regulations: FCA MAR — Market Abuse Regulation (insider information controls) | FCA COBS 12.2 — Research independence requirements | MiFID II — Conflicts of interest and research objectivity
+> Risk: **high** | Version: 2.1.0 | Regulations: FCA MAR — Market Abuse Regulation (insider information controls) | FCA COBS 12.2 — Research independence requirements | MiFID II — Conflicts of interest and research objectivity
 
 *All steps, controls, and restrictions below are defined by your supervisor. Follow this procedure exactly.*
 
@@ -66,7 +66,6 @@ If any of these conditions arise, invoke the checkpoint immediately and halt. No
 An input data source is flagged as potentially containing material non-public information (MNPI) about the target company. Processing must halt immediately and be escalated to the MNPI Compliance desk.
 
 **Trigger:** An input data source is flagged as potentially containing material non-public information (MNPI) about the target company, or originates from a deal room.
-**Condition hint:** `data_source.mnpi_flag == true OR data_source.origin == "deal_room"`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -78,12 +77,11 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # Exit code 2 — halt all processing immediately.
 ```
 
-### target-on-restricted-list — Target on Restricted or Watch List
+### target-on-restricted-list — Target On Restricted List
 
 The target company appears on the firm's restricted or watch list, indicating an active deal or conflict of interest. Processing must halt immediately and be escalated to the Conflicts Office.
 
 **Trigger:** The target company matches an entry on the firm's restricted or watch list.
-**Condition hint:** `restricted_list_check.match == true`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -95,7 +93,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # Exit code 2 — halt all processing immediately.
 ```
 
-### data-source-not-approved — Unapproved Data Source
+### data-source-not-approved — Data Source Not Approved
 
 The agent has attempted to retrieve data from a vendor or source not on the approved data vendor list. Processing must halt and the IB Data Governance team must be notified.
 
@@ -116,7 +114,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 
 These checkpoints are invoked at specific workflow steps (see Workflow section).
 
-### restricted-list-cleared — Restricted List Check Complete
+### restricted-list-cleared — Restricted List Cleared
 
 Classification: **needs_approval** | Reviewer: Compliance — Conflicts Office | SLA: 2h
 
@@ -133,7 +131,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### valuation-senior-review — Senior Banker Valuation Review
+### valuation-senior-review — Valuation Senior Review
 
 Classification: **needs_approval** | Reviewer: VP or MD — Investment Banking Coverage | SLA: 24h
 
@@ -150,7 +148,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### external-sharing-approval — External Distribution Sign-off
+### external-sharing-approval — External Sharing Approval
 
 Classification: **needs_approval** | Reviewer: Coverage Managing Director | SLA: 4h
 
@@ -172,7 +170,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 
 These activate when their trigger condition is met during any workflow step.
 
-### private-company-target — Private Company — Enhanced Data Governance Review
+### private-company-target — Private Company Target
 
 Classification: **needs_approval** | Reviewer: Legal Counsel + Compliance | SLA: 48h
 
@@ -191,7 +189,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### data-anomaly-flagged — Financial Data Anomaly Review
+### data-anomaly-flagged — Data Anomaly Flagged
 
 Classification: **review** | Reviewer: Analyst or Associate — Investment Banking Coverage | SLA: 4h
 

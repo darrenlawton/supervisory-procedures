@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import sys
-from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -77,8 +76,8 @@ def _collect_list(prompt: str, min_items: int = 1) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def _step_business_area(registry_path: Path) -> str:
-    """Step 1 / 9 — select or create a business area."""
-    console.rule("[bold cyan]Step 1 / 9 — Business Area[/bold cyan]")
+    """Step 1 / 8 — select or create a business area."""
+    console.rule("[bold cyan]Step 1 / 8 — Business Area[/bold cyan]")
     existing = sorted(
         d.name for d in registry_path.iterdir() if d.is_dir() and not d.name.startswith(".")
     ) if registry_path.exists() else []
@@ -95,8 +94,8 @@ def _step_business_area(registry_path: Path) -> str:
 
 
 def _step_name_version(business_area: str) -> tuple[str, str, str, str]:
-    """Step 2 / 9 — skill name, version, id."""
-    console.rule("[bold cyan]Step 2 / 9 — Skill Name & Version[/bold cyan]")
+    """Step 2 / 8 — skill name, version, id."""
+    console.rule("[bold cyan]Step 2 / 8 — Skill Name & Version[/bold cyan]")
     name = _ask("Skill name (display name):")
     version = _ask("Version:", default="1.0.0")
     suggested_id = f"{business_area}/{_slug(name)}"
@@ -108,8 +107,8 @@ def _step_name_version(business_area: str) -> tuple[str, str, str, str]:
 
 
 def _step_supervisor() -> dict[str, str]:
-    """Step 3 / 9 — supervisor details."""
-    console.rule("[bold cyan]Step 3 / 9 — Supervisor Details[/bold cyan]")
+    """Step 3 / 8 — supervisor details."""
+    console.rule("[bold cyan]Step 3 / 8 — Supervisor Details[/bold cyan]")
     return {
         "name": _ask("Supervisor full name:"),
         "email": _ask("Supervisor email:"),
@@ -118,8 +117,8 @@ def _step_supervisor() -> dict[str, str]:
 
 
 def _step_context() -> dict[str, Any]:
-    """Step 4 / 9 — context block."""
-    console.rule("[bold cyan]Step 4 / 9 — Context[/bold cyan]")
+    """Step 4 / 8 — context block."""
+    console.rule("[bold cyan]Step 4 / 8 — Context[/bold cyan]")
     description = _ask("Description (what business activity does this skill govern?):")
     rationale = _ask("Business rationale (why is AI appropriate here?):")
     regulations = _collect_list("Applicable regulations (e.g. FCA CONC 5.2):", min_items=0)
@@ -132,10 +131,13 @@ def _step_context() -> dict[str, Any]:
     }
 
 
-def _step_scope() -> dict[str, Any]:
-    """Step 5 / 9 — approved activities."""
-    console.rule("[bold cyan]Step 5 / 9 — Scope (Approved Activities)[/bold cyan]")
-    console.print("Enter each approved activity. You'll be prompted for a description then an ID slug.")
+def _step_approved_activities() -> list[dict[str, str]]:
+    """Step 5 / 8 — approved activities (exhaustive allowlist)."""
+    console.rule("[bold cyan]Step 5 / 8 — Approved Activities[/bold cyan]")
+    console.print(
+        "Enter each approved activity. You'll be prompted for a description then an ID slug.\n"
+        "[dim]Audit logging is automatic — do not add an audit-log activity.[/dim]"
+    )
     activities: list[dict[str, str]] = []
     while True:
         console.print(f"\n  [bold]Activity #{len(activities) + 1}[/bold] (blank description to finish)")
@@ -148,12 +150,12 @@ def _step_scope() -> dict[str, Any]:
         suggested_id = _slug(desc)[:40]
         act_id = _ask(f"  ID (slug):", default=suggested_id).strip()
         activities.append({"id": act_id or suggested_id, "description": desc})
-    return {"approved_activities": activities}
+    return activities
 
 
 def _step_constraints() -> dict[str, Any]:
-    """Step 6 / 9 — procedural requirements and unacceptable actions."""
-    console.rule("[bold cyan]Step 6 / 9 — Constraints[/bold cyan]")
+    """Step 6 / 8 — procedural requirements and unacceptable actions."""
+    console.rule("[bold cyan]Step 6 / 8 — Constraints[/bold cyan]")
     console.print(
         "[dim]Procedural requirements are cross-cutting behavioural principles only.\n"
         "Do not repeat constraints already expressed by workflow ordering, control points,\n"
@@ -168,44 +170,46 @@ def _step_constraints() -> dict[str, Any]:
 
 
 def _step_control_points() -> list[dict[str, Any]]:
-    """Step 7 / 9 — control points (unified veto + oversight model)."""
-    console.rule("[bold cyan]Step 7 / 9 — Control Points[/bold cyan]")
+    """Step 7 / 8 — control points (unified veto + oversight model)."""
+    console.rule("[bold cyan]Step 7 / 8 — Control Points[/bold cyan]")
     console.print(
         "Define control points — moments where the agent must pause, notify, or halt.\n"
         "Classifications: [bold]vetoed[/bold] = halt unconditionally, "
         "[bold]needs_approval[/bold] = explicit sign-off required, "
         "[bold]review[/bold] = human reviews before proceeding, "
         "[bold]notify[/bold] = human informed but not blocked, "
-        "[bold]auto[/bold] = agent proceeds without human involvement."
+        "[bold]auto[/bold] = agent proceeds without human involvement.\n\n"
+        "Activation: [bold]conditional[/bold] = fires when a trigger condition is detected "
+        "(at any workflow step), [bold]step[/bold] = fires when referenced by a specific workflow step."
     )
     control_points: list[dict[str, Any]] = []
 
     while True:
         console.print(f"\n  [bold]Control point #{len(control_points) + 1}[/bold]")
         cp_id = _slug(_ask("  ID (slug, e.g. sanctions-match):"))
-        cp_name = _ask("  Name:")
         cp_desc = _ask("  Description:")
         classification = _ask_select("  Classification:", _CLASSIFICATIONS)
-        trigger = _ask("  Trigger condition — plain English (optional, press Enter to skip):")
-        condition_hint = _ask("  Condition hint for developers (optional, press Enter to skip):")
-        who = _ask("  Who reviews/approves? (optional, press Enter to skip):")
-        escalation = _ask("  Escalation contact (optional, press Enter to skip):")
-        sla_str = _ask("  SLA in hours (optional, press Enter to skip):")
+        activation = _ask_select("  Activation:", ["conditional", "step"])
 
         cp: dict[str, Any] = {
             "id": cp_id or f"cp-{len(control_points) + 1}",
-            "name": cp_name,
             "description": cp_desc,
             "classification": classification,
+            "activation": activation,
         }
-        if trigger:
-            cp["trigger_condition"] = trigger
-        if condition_hint:
-            cp["condition_hint"] = condition_hint
-        if who:
+
+        if activation == "conditional":
+            trigger = _ask("  Trigger condition — plain English:")
+            cp["trigger"] = trigger
+
+        if classification in ("needs_approval", "review", "notify"):
+            who = _ask("  Who reviews/approves?:")
             cp["who_reviews"] = who
-        if escalation:
+        elif classification == "vetoed":
+            escalation = _ask("  Escalation contact (email or team name):")
             cp["escalation_contact"] = escalation
+
+        sla_str = _ask("  SLA in hours (optional, press Enter to skip):")
         if sla_str.isdigit():
             cp["sla_hours"] = int(sla_str)
 
@@ -218,24 +222,26 @@ def _step_control_points() -> list[dict[str, Any]]:
 
 
 def _step_workflow(approved_activities: list[dict[str, str]]) -> dict[str, Any]:
-    """Step 8 / 9 — workflow steps."""
-    console.rule("[bold cyan]Step 8 / 9 — Workflow Steps[/bold cyan]")
-    console.print("Define the ordered steps the agent will execute.")
+    """Step 8 / 8 — workflow steps."""
+    console.rule("[bold cyan]Step 8 / 8 — Workflow Steps[/bold cyan]")
+    console.print(
+        "Define the ordered steps the agent will execute.\n"
+        "[dim]Step ID defaults to the activity ID if left blank.[/dim]"
+    )
     choices = [f"{a['id']}  —  {a['description']}" for a in approved_activities]
     choice_to_id = {c: a["id"] for c, a in zip(choices, approved_activities)}
     steps: list[dict[str, Any]] = []
 
     while True:
         console.print(f"\n  [bold]Step #{len(steps) + 1}[/bold]")
-        step_id = _slug(_ask("  ID (slug, e.g. check-identity):"))
         selected = _ask_select("  Activity:", choices)
         activity = choice_to_id[selected]
+        step_id_input = _ask("  Step ID (optional, press Enter to default to activity ID):").strip()
         cp_ref = _ask("  Control point ID to attach (optional, press Enter to skip):")
 
-        step: dict[str, Any] = {
-            "id": step_id or f"step-{len(steps) + 1}",
-            "activity": activity,
-        }
+        step: dict[str, Any] = {"activity": activity}
+        if step_id_input and step_id_input != activity:
+            step["id"] = _slug(step_id_input) or step_id_input
         if cp_ref:
             step["control_point"] = cp_ref
 
@@ -253,8 +259,8 @@ def _step_agents_and_save(
     skill_slug: str,
     business_area: str,
 ) -> None:
-    """Step 9 / 9 — authorised agents, YAML preview, save."""
-    console.rule("[bold cyan]Step 9 / 9 — Authorised Agents & Save[/bold cyan]")
+    """Final step — authorised agents, YAML preview, save."""
+    console.rule("[bold cyan]Final Step — Authorised Agents & Save[/bold cyan]")
     console.print(
         "Enter the agent IDs authorised to load this skill.\n"
         "Use format [cyan]<function>-agent-<environment>[/cyan], e.g. loan-processor-agent-prod\n"
@@ -327,7 +333,7 @@ def _step_agents_and_save(
 def new(registry: str | None) -> None:
     """Launch the guided wizard to create a new Agent Skill YAML.
 
-    Walks through 9 steps covering all required schema fields and writes
+    Walks through 8 steps covering all required schema fields and writes
     a validated YAML file to the registry.
     """
     registry_path = Path(registry) if registry else _DEFAULT_REGISTRY
@@ -345,27 +351,23 @@ def new(registry: str | None) -> None:
     name, version, skill_id, skill_slug = _step_name_version(business_area)
     supervisor = _step_supervisor()
     context = _step_context()
-    scope = _step_scope()
+    approved_activities = _step_approved_activities()
     constraints = _step_constraints()
     control_points = _step_control_points()
-    workflow = _step_workflow(scope["approved_activities"])
+    workflow = _step_workflow(approved_activities)
 
-    today = date.today().isoformat()
     skill_data: dict[str, Any] = {
         "metadata": {
             "id": skill_id,
             "name": name,
             "version": version,
-            "schema_version": "2.0",
+            "schema_version": "2.1",
             "business_area": business_area,
             "supervisor": supervisor,
             "status": "draft",
-            "created_at": today,
-            "approved_at": None,
-            "approved_by": None,
         },
         "context": context,
-        "scope": scope,
+        "approved_activities": approved_activities,
         "constraints": constraints,
         "control_points": control_points,
         "workflow": workflow,

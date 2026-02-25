@@ -2,7 +2,7 @@ metadata:
   id: test_area/test-skill
   name: Test Skill
   version: 1.0.0
-  schema_version: "2.0"
+  schema_version: "2.1"
   business_area: test_area
   supervisor:
     name: Test Supervisor
@@ -21,10 +21,9 @@ context:
   applicable_regulations: []
   risk_classification: low
 
-scope:
-  approved_activities:
-    - id: run-query
-      description: Perform read-only queries against the test database
+approved_activities:
+  - id: run-query
+    description: Perform read-only queries against the test database
 
 constraints:
   procedural_requirements:
@@ -34,19 +33,19 @@ constraints:
 
 control_points:
   - id: error-threshold-exceeded
-    name: Error Threshold Exceeded
     description: The number of consecutive errors exceeds the allowed threshold.
     classification: vetoed
-    trigger_condition: Consecutive error count exceeds the configured threshold.
+    activation: conditional
+    trigger: Consecutive error count exceeds the configured threshold.
+    escalation_contact: ops-team@example.com
 
   - id: initial-review
-    name: Initial Review
     description: Review the output before proceeding.
     classification: review
+    activation: step
     who_reviews: Test reviewer
 
 workflow:
   steps:
-    - id: run-query
-      activity: run-query
+    - activity: run-query
       control_point: initial-review

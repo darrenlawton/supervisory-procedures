@@ -1,5 +1,54 @@
 # Schema Changelog
 
+## v2.1 (2026-02-25)
+
+Implements schema simplification recommendations from
+`docs/schema-simplification-recommendations.md`.
+
+### Breaking changes
+- `scope.approved_activities` **removed**. Replaced by top-level `approved_activities` array
+  (Rec 5 — flatten the `scope` wrapper, Option A).
+- `trigger_condition` on control points **renamed** to `trigger` (Rec 10).
+- `condition_hint` on control points **removed** — implementation detail, not a supervisory decision (Rec 6).
+- `helper_skills` section **removed** — standard helpers are unconditionally included by the renderer (Rec 2).
+- `schema_version` enum changed from `"2.0"` to `"2.1"`.
+
+### Added
+- `activation` field on control points (required, enum `conditional | step`) — makes the two
+  activation models explicit: `conditional` fires when a trigger condition is detected at any
+  workflow step; `step` fires when referenced by a specific workflow step via `control_point` (Rec 10).
+- Conditional required fields on control points (Rec 11):
+  - `classification: needs_approval | review | notify` → requires `who_reviews`
+  - `classification: vetoed` → requires `escalation_contact`
+- `activation: conditional` → requires `trigger` (Rec 10).
+- Optional `artifacts` section to formalise the skill directory contract; enables artifact
+  consistency validation (Rec 9).
+- Artifact consistency validation pass in the validator (`_check_artifact_consistency`) (Rec 8):
+  - Warns if `escalation_contact` in a control point is not found in `resources/escalation_contacts.md`
+  - Warns if a regulation in `context.applicable_regulations` has no matching reference in `resources/regulations.md`
+  - Errors if `workflow.steps[].uses_skill` references a shared skill that doesn't exist in `registry/`
+  - Warns if `scripts/` contains unreferenced Python files
+- Validator semantic check: `activation: step` control points must be referenced by at least one
+  `workflow.steps[].control_point`; produces a warning if not (Rec 10).
+
+### Changed
+- `metadata.created_at`, `metadata.approved_at`, `metadata.approved_by` are now **optional**.
+  They are lifecycle metadata managed by the approval pipeline, not required from authors.
+  The wizard no longer emits them; the hub sets them on approval (Rec 3).
+- `workflow.steps[].id` is now **optional**. When omitted, the step ID defaults to the
+  activity ID. Override only needed when the same activity appears more than once (Rec 4).
+- `control_points[].name` is now **optional**. When omitted, tooling derives a display name
+  by converting the slug to title case (Rec 7).
+
+### Removed
+- `helper_skills` top-level section (Rec 2) — the standard helper skills
+  (`shared/audit-logging`, `shared/checkpoint-gate`, `shared/validate-activity`) are now
+  unconditionally included by the renderer.
+- `control_points[].condition_hint` (Rec 6) — belongs in `scripts/` or code comments,
+  not in the manager-authored supervisory document.
+
+---
+
 ## v2.0 (2026-02-24)
 
 ### Breaking changes
