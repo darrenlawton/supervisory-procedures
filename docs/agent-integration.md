@@ -63,7 +63,7 @@ Layer 3 means invalid skills are silently excluded from the cache at load time. 
 
 ## Reading the Agent Instructions (SKILL.md)
 
-`skill["_skill_dir"]` is the path to the skill's directory. `SKILL.md` inside that directory is the [Claude Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) compatible instruction document generated from `skill.yml`.
+`skill["_skill_dir"]` is the path to the skill's directory. `SKILL.md` inside that directory is the Agent Skills compatible instruction document generated from `skill.yml`.
 
 It contains the supervisor's approved activities, ordered workflow, control points, and unacceptable actions, formatted as concrete agent instructions with embedded bash commands for all runtime enforcement scripts.
 

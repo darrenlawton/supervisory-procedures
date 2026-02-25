@@ -73,7 +73,7 @@ def read_skill_instructions(skill_data: dict) -> str:
 
     SKILL.md is generated from skill.yml by `supv render` and contains the
     supervisor's approved activities, workflow, control points, and constraints
-    formatted as Claude Agent Skills compatible instructions.
+    formatted as Agent Skills compatible instructions.
     """
     skill_dir = Path(skill_data["_skill_dir"])
     skill_md = skill_dir / "SKILL.md"

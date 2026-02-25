@@ -23,14 +23,14 @@ Authoring a skill is the supervisory act. It is how a business area formally tak
 ## How it works
 
 ```
-skill.yml  ──[supv render]──►  SKILL.md (Claude Agent Skills format)
+skill.yml  ──[supv render]──►  SKILL.md (Agent Skills format)
     │                               │
     │  schema-validated              │  agent reads at runtime
     │  supervisor-governed           │  supervisor's procedure enforced as instructions
     └── single source of truth      └── never edited by hand
 ```
 
-`skill.yml` is the governed definition — authored by the supervisor, schema-validated, approved via PR. `SKILL.md` is generated from it in [Claude Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format, embedding the supervisor's approved activities, control points, and workflow directly into the agent's instruction document. The agent cannot deviate from the procedure because it is structural, not advisory.
+`skill.yml` is the governed definition — authored by the supervisor, schema-validated, approved via PR. `SKILL.md` is generated from it in Agent Skills format, embedding the supervisor's approved activities, control points, and workflow directly into the agent's instruction document. The agent cannot deviate from the procedure because it is structural, not advisory.
 
 ## Getting Started
 

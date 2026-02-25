@@ -61,7 +61,7 @@ Implements schema simplification recommendations from
 ### Added
 - `control_points` array (required, min 1) — unified model for all human oversight, from unconditional halt (`vetoed`) to automatic pass-through (`auto`). Each control point has `id`, `name`, `description`, `classification`, and optional fields: `trigger_condition`, `condition_hint`, `who_reviews`, `escalation_contact`, `sla_hours`.
 - `workflow.steps[].control_point` — references a control point `id` (without `trigger_condition`) to invoke after the step completes. Replaces the separate `veto_trigger` and `checkpoint` fields from v1.1.
-- `SKILL.md` generation — `supv render` generates a Claude Agent Skills compatible instruction document from `skill.yml`. CI validates that `SKILL.md` matches the current `skill.yml` in strict mode.
+- `SKILL.md` generation — `supv render` generates an Agent Skills compatible instruction document from `skill.yml`. CI validates that `SKILL.md` matches the current `skill.yml` in strict mode.
 
 ### Removed
 - `hard_veto_triggers` block

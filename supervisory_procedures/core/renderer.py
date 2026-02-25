@@ -1,4 +1,4 @@
-"""Renderer — generates a Claude Agent Skills compatible SKILL.md from skill.yml data."""
+"""Renderer — generates an Agent Skills compatible SKILL.md from skill.yml data."""
 
 from __future__ import annotations
 
