@@ -49,7 +49,6 @@ If `"allowed": false` — halt immediately and log the attempt.
 | `classify-hits` | Classify each hit as: confirmed match, partial match (yellow flag), or false positive |
 | `generate-evidence-package` | Generate a structured evidence package summarising the data sources consulted, the reasoning followed, and the recommended disposition |
 | `present-recommendation` | Present the recommendation (Accept / Decline / Partial Match) to the human compliance officer for final approval |
-| `audit-log` | Log all data accesses, sources queried, reasoning steps, and recommended actions to the immutable audit trail |
 
 ---
 ## What You Must Never Do
@@ -462,19 +461,4 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
   --reviewer "Qualified compliance officer (BSA/AML certified)" \
   --sla-hours 1
 # PENDING — halt here and await explicit approval before continuing.
-```
-
-### Step 13 — log-audit
-
-**Activity:** Log all data accesses, sources queried, reasoning steps, and recommended actions to the immutable audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/financial_crime_compliance/sanctions-pep-alert-review/skill.yml \
-  --step log-audit
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill financial_crime_compliance/sanctions-pep-alert-review \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-audit
 ```

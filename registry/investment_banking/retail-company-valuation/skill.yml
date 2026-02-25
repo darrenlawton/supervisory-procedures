@@ -52,8 +52,6 @@ scope:
       description: Generate a structured valuation summary report for senior banker review
     - id: deliver-model
       description: Package and deliver the approved valuation model to authorised recipients
-    - id: audit-log
-      description: Log all data sources, versions, and assumptions to the audit trail
 
 constraints:
   procedural_requirements:
@@ -167,38 +165,20 @@ workflow:
       activity: restricted-list-check
       control_point: restricted-list-cleared
 
-    - id: log-list-check
-      activity: audit-log
-
     - id: retrieve-public-filings
       activity: retrieve-public-filings
-
-    - id: log-filings-retrieved
-      activity: audit-log
 
     - id: pull-market-data
       activity: pull-market-data
 
-    - id: log-market-data-retrieved
-      activity: audit-log
-
     - id: calculate-trading-multiples
       activity: calculate-trading-multiples
-
-    - id: log-multiples-calculated
-      activity: audit-log
 
     - id: build-dcf-inputs
       activity: build-dcf-inputs
 
-    - id: log-dcf-built
-      activity: audit-log
-
     - id: construct-lbo-skeleton
       activity: construct-lbo-skeleton
-
-    - id: log-lbo-constructed
-      activity: audit-log
 
     - id: flag-data-anomalies
       activity: flag-data-anomalies
@@ -207,15 +187,9 @@ workflow:
       activity: generate-valuation-report
       control_point: valuation-senior-review
 
-    - id: log-report-generated
-      activity: audit-log
-
     - id: deliver-model
       activity: deliver-model
       control_point: external-sharing-approval
-
-    - id: log-delivery
-      activity: audit-log
 
 helper_skills:
   - id: shared/audit-logging

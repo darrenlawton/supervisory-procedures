@@ -88,11 +88,9 @@ scope:
   approved_activities:
     - id: calculate-dti
       description: Calculate debt-to-income ratio using declared and verified income figures
-    - id: audit-log
-      description: Log all actions and data accesses to the audit trail
 ```
 
-Multiple workflow steps can reference the same activity (e.g. several `log-*` steps all referencing `audit-log`).
+Do **not** add an `audit-log` activity — audit logging is automatic. Every workflow step is logged to the audit trail by the system without any explicit logging steps in the skill definition (see note below).
 
 Good description: _"Calculate debt-to-income ratio using declared and verified income figures"_
 Too vague: _"Process financial data"_
@@ -108,18 +106,18 @@ Use `classification: vetoed` for conditions where continued agent operation woul
 
 ### 3. Map Every Workflow Step to an Approved Activity
 
-Each step in `workflow.steps` must reference an `activity` that is the `id` of an entry in `scope.approved_activities`. Multiple steps may reference the same activity ID (e.g. repeated logging steps):
+Each step in `workflow.steps` must reference an `activity` that is the `id` of an entry in `scope.approved_activities`:
 
 ```yaml
 workflow:
   steps:
     - id: calculate-dti
       activity: calculate-dti
-    - id: log-dti-calculated
-      activity: audit-log   # same activity as other log-* steps
 ```
 
-The agent validates each step ID against the workflow at runtime before executing.
+The agent validates each step against the allowlist at runtime before executing.
+
+> **Audit logging is automatic.** You do not need to add `log-*` steps to your workflow. The system emits an audit trail entry for every workflow step automatically — including the action taken, session identifier, and timestamp. This is handled by the `shared/audit-logging` helper skill and requires no manual steps in your skill definition.
 
 ### 4. Keep Procedural Requirements Cross-Cutting
 
@@ -129,7 +127,7 @@ The agent validates each step ID against the workflow at runtime before executin
 |---|---|
 | Workflow step order | "Run sanctions screening before any credit check" |
 | A control point | "Present recommendation to underwriter before issuing offer" |
-| `log-*` workflow steps | "Record an audit log entry for every data access" |
+| Automatic audit logging | "Record an audit log entry for every data access" |
 | `unacceptable_actions` | Anything the agent must never do |
 
 Good candidates: regulatory principles that apply throughout (e.g. equality / non-discrimination), standing references to external SOPs, output quality requirements that apply to multiple steps.

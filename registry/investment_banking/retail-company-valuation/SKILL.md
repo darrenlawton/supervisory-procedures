@@ -46,7 +46,6 @@ If `"allowed": false` — halt immediately and log the attempt.
 | `flag-data-anomalies` | Flag data gaps or anomalies in source financials for analyst follow-up |
 | `generate-valuation-report` | Generate a structured valuation summary report for senior banker review |
 | `deliver-model` | Package and deliver the approved valuation model to authorised recipients |
-| `audit-log` | Log all data sources, versions, and assumptions to the audit trail |
 
 ---
 ## What You Must Never Do
@@ -244,22 +243,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### Step 2 — log-list-check
-
-**Activity:** Log all data sources, versions, and assumptions to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/investment_banking/retail-company-valuation/skill.yml \
-  --step log-list-check
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill investment_banking/retail-company-valuation \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-list-check
-```
-
-### Step 3 — retrieve-public-filings
+### Step 2 — retrieve-public-filings
 
 **Activity:** Retrieve public financial filings (10-K, 20-F, annual reports) for target and comparable companies
 
@@ -274,22 +258,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action retrieve-public-filings
 ```
 
-### Step 4 — log-filings-retrieved
-
-**Activity:** Log all data sources, versions, and assumptions to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/investment_banking/retail-company-valuation/skill.yml \
-  --step log-filings-retrieved
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill investment_banking/retail-company-valuation \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-filings-retrieved
-```
-
-### Step 5 — pull-market-data
+### Step 3 — pull-market-data
 
 **Activity:** Pull approved market data feeds for share price, EV, and trading multiples
 
@@ -304,22 +273,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action pull-market-data
 ```
 
-### Step 6 — log-market-data-retrieved
-
-**Activity:** Log all data sources, versions, and assumptions to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/investment_banking/retail-company-valuation/skill.yml \
-  --step log-market-data-retrieved
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill investment_banking/retail-company-valuation \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-market-data-retrieved
-```
-
-### Step 7 — calculate-trading-multiples
+### Step 4 — calculate-trading-multiples
 
 **Activity:** Calculate EV/EBITDA, P/E, EV/Sales, and EV/EBIT multiples for comparable companies
 
@@ -334,22 +288,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action calculate-trading-multiples
 ```
 
-### Step 8 — log-multiples-calculated
-
-**Activity:** Log all data sources, versions, and assumptions to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/investment_banking/retail-company-valuation/skill.yml \
-  --step log-multiples-calculated
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill investment_banking/retail-company-valuation \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-multiples-calculated
-```
-
-### Step 9 — build-dcf-inputs
+### Step 5 — build-dcf-inputs
 
 **Activity:** Build DCF model inputs using normalised historical financials and published consensus forecasts
 
@@ -364,22 +303,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action build-dcf-inputs
 ```
 
-### Step 10 — log-dcf-built
-
-**Activity:** Log all data sources, versions, and assumptions to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/investment_banking/retail-company-valuation/skill.yml \
-  --step log-dcf-built
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill investment_banking/retail-company-valuation \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-dcf-built
-```
-
-### Step 11 — construct-lbo-skeleton
+### Step 6 — construct-lbo-skeleton
 
 **Activity:** Construct LBO model skeleton with standard leverage assumptions
 
@@ -394,22 +318,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action construct-lbo-skeleton
 ```
 
-### Step 12 — log-lbo-constructed
-
-**Activity:** Log all data sources, versions, and assumptions to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/investment_banking/retail-company-valuation/skill.yml \
-  --step log-lbo-constructed
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill investment_banking/retail-company-valuation \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-lbo-constructed
-```
-
-### Step 13 — flag-data-anomalies
+### Step 7 — flag-data-anomalies
 
 **Activity:** Flag data gaps or anomalies in source financials for analyst follow-up
 
@@ -424,7 +333,7 @@ python registry/shared/audit-logging/scripts/audit_log.py \
   --action flag-data-anomalies
 ```
 
-### Step 14 — generate-valuation-report
+### Step 8 — generate-valuation-report
 
 **Activity:** Generate a structured valuation summary report for senior banker review
 
@@ -452,22 +361,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### Step 15 — log-report-generated
-
-**Activity:** Log all data sources, versions, and assumptions to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/investment_banking/retail-company-valuation/skill.yml \
-  --step log-report-generated
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill investment_banking/retail-company-valuation \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-report-generated
-```
-
-### Step 16 — deliver-model
+### Step 9 — deliver-model
 
 **Activity:** Package and deliver the approved valuation model to authorised recipients
 
@@ -493,19 +387,4 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
   --reviewer "Coverage Managing Director" \
   --sla-hours 4
 # PENDING — halt here and await explicit approval before continuing.
-```
-
-### Step 17 — log-delivery
-
-**Activity:** Log all data sources, versions, and assumptions to the audit trail
-
-```bash
-python registry/shared/validate-activity/scripts/validate_activity.py \
-  --skill registry/investment_banking/retail-company-valuation/skill.yml \
-  --step log-delivery
-
-python registry/shared/audit-logging/scripts/audit_log.py \
-  --skill investment_banking/retail-company-valuation \
-  --session ${CLAUDE_SESSION_ID} \
-  --action log-delivery
 ```

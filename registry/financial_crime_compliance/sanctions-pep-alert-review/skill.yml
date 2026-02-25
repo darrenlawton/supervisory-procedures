@@ -73,8 +73,6 @@ scope:
       description: Generate a structured evidence package summarising the data sources consulted, the reasoning followed, and the recommended disposition
     - id: present-recommendation
       description: Present the recommendation (Accept / Decline / Partial Match) to the human compliance officer for final approval
-    - id: audit-log
-      description: Log all data accesses, sources queried, reasoning steps, and recommended actions to the immutable audit trail
 
 constraints:
   procedural_requirements:
@@ -279,9 +277,6 @@ workflow:
     - id: present-recommendation
       activity: present-recommendation
       control_point: final-disposition-approval
-
-    - id: log-audit
-      activity: audit-log
 
 helper_skills:
   - id: shared/audit-logging
