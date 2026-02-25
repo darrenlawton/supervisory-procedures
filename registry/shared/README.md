@@ -58,7 +58,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 
 ### Example / advisory skills (SKILL.md only — no skill.yml)
 
-These skills are provided as working examples from Anthropic's agent skills library.
+These skills are provided as working examples from the agent skills library.
 They demonstrate the SKILL.md progressive-disclosure format and can be used directly
 or adapted for your own workflows.
 

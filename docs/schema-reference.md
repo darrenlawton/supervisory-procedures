@@ -132,6 +132,6 @@ These files are produced by `supv render` and must never be edited by hand:
 
 | File | Description |
 |---|---|
-| `SKILL.md` | Claude Agent Skills compatible instruction document. Contains the supervisor's procedure formatted as agent-readable instructions with embedded bash commands for all helper skill invocations. |
+| `SKILL.md` | Agent Skills compatible instruction document. Contains the supervisor's procedure formatted as agent-readable instructions with embedded bash commands for all helper skill invocations. |
 
 The CI pipeline validates that `SKILL.md` matches the current `skill.yml` on every PR. If `skill.yml` is updated without re-running `supv render`, validation fails.
