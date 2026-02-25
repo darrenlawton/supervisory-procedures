@@ -251,3 +251,14 @@ workflow:
 
     - activity: present-recommendation
       control_point: final-disposition-approval
+
+artifacts:
+  resources:
+    - file: regulations.md
+      description: Detailed regulatory obligations and agent-specific guidance for each applicable regulation
+    - file: escalation_contacts.md
+      description: Contact directory for all Financial Crime team escalations
+  scripts:
+    - file: confidence_check.py
+      description: Evaluates the agent's overall recommendation confidence score against the minimum acceptable threshold
+      used_by_activity: classify-hits

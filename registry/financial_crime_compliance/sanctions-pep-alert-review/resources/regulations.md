@@ -31,6 +31,18 @@ relationships, including ongoing monitoring.
 matching process (name, DOB, location) and must be reviewed by a qualified
 compliance officer before any onboarding decision is made.
 
+## FinCEN — Joint Statement on Innovative Efforts to Combat Money Laundering (2018)
+
+FinCEN and the federal banking agencies issued a joint statement encouraging
+financial institutions to take innovative approaches to AML compliance, including
+the use of AI and machine learning for suspicious activity monitoring. AI-assisted
+review is explicitly encouraged where it improves detection and reduces false
+positives, provided human oversight and explainability requirements are met.
+
+**Agent obligation:** The agent's evidence package must include a confidence score
+and a summary of the reasoning followed, satisfying the explainability requirement.
+All final disposition decisions remain with a qualified human compliance officer.
+
 ## Fed/OCC SR 11-7 — Model Risk Management
 
 Regulators require financial institutions to manage the risk that AI and model

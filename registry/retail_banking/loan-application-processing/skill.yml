@@ -204,3 +204,17 @@ workflow:
     - id: notify-applicant-decision
       activity: send-notification
       control_point: decision-communication
+
+artifacts:
+  resources:
+    - file: regulations.md
+      description: Detailed regulatory obligations and agent-specific guidance for each applicable regulation
+    - file: escalation_contacts.md
+      description: Contact directory for underwriting team and financial crime escalations
+  scripts:
+    - file: sanctions_check.py
+      description: Wraps the HM Treasury and OFAC sanctions screening API for applicant name and DOB matching
+      used_by_activity: sanctions-screening
+    - file: identity_verify.py
+      description: Cross-references applicant identity documents against two independent verification sources
+      used_by_activity: retrieve-documents
