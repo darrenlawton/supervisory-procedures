@@ -6,7 +6,7 @@ description: "AI-assisted processing of personal loan applications. The agent re
 # Loan Application Processing
 
 > **Governed Skill** — Supervisor: Sarah Johnson (Head of Consumer Credit Operations)
-> Risk: **high** | Version: 2.0.0 | Regulations: FCA CONC 5.2 — Creditworthiness assessment | FCA CONC 7.3 — Arrears and default | ICO UK GDPR — Automated decision-making (Article 22) | Equality Act 2010 — Protected characteristics
+> Risk: **high** | Version: 2.1.0 | Regulations: FCA CONC 5.2 — Creditworthiness assessment | FCA CONC 7.3 — Arrears and default | ICO UK GDPR — Automated decision-making (Article 22) | Equality Act 2010 — Protected characteristics
 
 *All steps, controls, and restrictions below are defined by your supervisor. Follow this procedure exactly.*
 
@@ -59,12 +59,11 @@ If `"allowed": false` — halt immediately and log the attempt.
 
 If any of these conditions arise, invoke the checkpoint immediately and halt. No human override is possible.
 
-### sanctions-match — Sanctions List Match
+### sanctions-match — Sanctions Match
 
 A positive match was returned when the applicant's name and date of birth were checked against the HM Treasury or OFAC consolidated sanctions lists. Processing must halt immediately and be escalated to the Financial Crime team.
 
 **Trigger:** Positive match returned from HM Treasury or OFAC sanctions screening with match_confidence >= 0.85 or exact_match == true.
-**Condition hint:** `sanctions_screening_result.match_confidence >= 0.85 OR sanctions_screening_result.exact_match == true`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -92,12 +91,11 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # Exit code 2 — halt all processing immediately.
 ```
 
-### data-quality-critical — Critical Data Quality Failure
+### data-quality-critical — Data Quality Critical
 
 Critical data required for a compliant creditworthiness assessment is missing or cannot be retrieved (e.g. credit bureau unavailable, income documents unreadable). Processing must halt and the underwriting team must be notified.
 
 **Trigger:** Critical required fields are missing or external services return errors that prevent a compliant assessment from being completed.
-**Condition hint:** `required_fields_missing.count > 0 OR external_service_errors.critical == true`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -114,7 +112,6 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 A data source or scoring model attempts to supply a protected characteristic (age band excepted by FCA) as a model feature. Processing must halt immediately and be escalated to Ethics and Compliance.
 
 **Trigger:** A data source or scoring model exposes a protected characteristic (e.g. ethnicity, religion, gender, disability) as a model input feature.
-**Condition hint:** `feature_flags.contains_protected_characteristic == true`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -148,7 +145,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### decision-communication — Lending Decision Communication
+### decision-communication — Decision Communication
 
 Classification: **notify** | Reviewer: Underwriter (approved the decision)
 
@@ -169,7 +166,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 
 These activate when their trigger condition is met during any workflow step.
 
-### high-value-application — High-Value Loan Application Review
+### high-value-application — High Value Application
 
 Classification: **needs_approval** | Reviewer: Underwriter + Head of Consumer Credit | SLA: 48h
 
@@ -188,7 +185,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### suspected-fraud-indicators — Fraud Indicators Detected
+### suspected-fraud-indicators — Suspected Fraud Indicators
 
 Classification: **needs_approval** | Reviewer: Financial Crime Investigation Team | SLA: 4h
 
@@ -207,7 +204,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### borderline-credit-score — Borderline Credit Score — Senior Review
+### borderline-credit-score — Borderline Credit Score
 
 Classification: **review** | Reviewer: Senior underwriter (Grade 5+) | SLA: 48h
 

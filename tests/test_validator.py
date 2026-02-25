@@ -129,7 +129,7 @@ class TestSchemaConstraints:
             validate_skill(path)
 
     def test_empty_approved_activities_rejected(self, tmp_path):
-        skill = self._make_skill({"scope": {"approved_activities": []}})
+        skill = self._make_skill({"approved_activities": []})
         path = tmp_path / "skill.yml"
         path.write_text(yaml.dump(skill))
         with pytest.raises(ValidationError):
@@ -144,9 +144,159 @@ class TestSchemaConstraints:
 
     def test_invalid_classification_rejected(self, tmp_path):
         skill = self._make_skill({
-            "control_points": [{"id": "test", "name": "Test", "description": "test", "classification": "do_nothing"}]
+            "control_points": [{
+                "id": "test",
+                "description": "test",
+                "classification": "do_nothing",
+                "activation": "step",
+            }]
         })
         path = tmp_path / "skill.yml"
         path.write_text(yaml.dump(skill))
         with pytest.raises(ValidationError):
             validate_skill(path)
+
+    def test_vetoed_without_escalation_contact_rejected(self, tmp_path):
+        """Rec 11: vetoed control point must have escalation_contact."""
+        skill = self._make_skill({
+            "control_points": [{
+                "id": "test-veto",
+                "description": "A vetoed control point.",
+                "classification": "vetoed",
+                "activation": "conditional",
+                "trigger": "Something bad happened.",
+                # escalation_contact intentionally omitted
+            }]
+        })
+        path = tmp_path / "skill.yml"
+        path.write_text(yaml.dump(skill))
+        with pytest.raises(ValidationError):
+            validate_skill(path)
+
+    def test_needs_approval_without_who_reviews_rejected(self, tmp_path):
+        """Rec 11: needs_approval control point must have who_reviews."""
+        skill = self._make_skill({
+            "control_points": [
+                # Keep a vetoed cp to satisfy the base schema
+                {
+                    "id": "error-threshold-exceeded",
+                    "description": "Errors exceeded.",
+                    "classification": "vetoed",
+                    "activation": "conditional",
+                    "trigger": "Errors exceeded.",
+                    "escalation_contact": "ops@example.com",
+                },
+                {
+                    "id": "test-approval",
+                    "description": "Needs approval.",
+                    "classification": "needs_approval",
+                    "activation": "step",
+                    # who_reviews intentionally omitted
+                },
+            ]
+        })
+        path = tmp_path / "skill.yml"
+        path.write_text(yaml.dump(skill))
+        with pytest.raises(ValidationError):
+            validate_skill(path)
+
+    def test_conditional_activation_without_trigger_rejected(self, tmp_path):
+        """Rec 10: activation: conditional requires trigger field."""
+        skill = self._make_skill({
+            "control_points": [
+                {
+                    "id": "test-conditional",
+                    "description": "A conditional control point.",
+                    "classification": "vetoed",
+                    "activation": "conditional",
+                    "escalation_contact": "ops@example.com",
+                    # trigger intentionally omitted
+                },
+            ]
+        })
+        path = tmp_path / "skill.yml"
+        path.write_text(yaml.dump(skill))
+        with pytest.raises(ValidationError):
+            validate_skill(path)
+
+    def test_step_activation_unreferenced_produces_warning(self, tmp_path):
+        """Rec 10: activation: step control point not referenced by any workflow step warns."""
+        skill = self._make_skill({
+            "control_points": [
+                {
+                    "id": "error-threshold-exceeded",
+                    "description": "Errors exceeded.",
+                    "classification": "vetoed",
+                    "activation": "conditional",
+                    "trigger": "Errors exceeded.",
+                    "escalation_contact": "ops@example.com",
+                },
+                {
+                    "id": "unreferenced-review",
+                    "description": "A step review that is never referenced.",
+                    "classification": "review",
+                    "activation": "step",
+                    "who_reviews": "Someone",
+                },
+            ]
+        })
+        path = tmp_path / "skill.yml"
+        path.write_text(yaml.dump(skill))
+        warnings = validate_skill(path)
+        assert any("unreferenced-review" in w.message for w in warnings)
+
+    def test_lifecycle_fields_optional(self, tmp_path):
+        """Rec 3: created_at, approved_at, approved_by are not required from authors."""
+        skill = self._make_skill({})
+        # Remove lifecycle fields — schema should still accept the skill
+        skill["metadata"].pop("created_at", None)
+        skill["metadata"].pop("approved_at", None)
+        skill["metadata"].pop("approved_by", None)
+        skill["metadata"]["status"] = "draft"
+        path = tmp_path / "skill.yml"
+        path.write_text(yaml.dump(skill))
+        # Should not raise — lifecycle fields are optional
+        warnings = validate_skill(path)
+        assert isinstance(warnings, list)
+
+    def test_step_id_optional(self, tmp_path):
+        """Rec 4: workflow step id is optional; activity id is used as fallback."""
+        skill = self._make_skill({
+            "workflow": {
+                "steps": [
+                    {"activity": "run-query", "control_point": "initial-review"},
+                ]
+            }
+        })
+        path = tmp_path / "skill.yml"
+        path.write_text(yaml.dump(skill))
+        warnings = validate_skill(path)
+        assert isinstance(warnings, list)
+
+    def test_control_point_name_optional(self, tmp_path):
+        """Rec 7: control point name is optional."""
+        skill = self._make_skill({
+            "control_points": [
+                {
+                    "id": "error-threshold-exceeded",
+                    "description": "Errors exceeded.",
+                    "classification": "vetoed",
+                    "activation": "conditional",
+                    "trigger": "Errors exceeded.",
+                    "escalation_contact": "ops@example.com",
+                    # name intentionally omitted
+                },
+                {
+                    "id": "initial-review",
+                    "description": "Review the output before proceeding.",
+                    "classification": "review",
+                    "activation": "step",
+                    "who_reviews": "Test reviewer",
+                    # name intentionally omitted
+                },
+            ]
+        })
+        path = tmp_path / "skill.yml"
+        path.write_text(yaml.dump(skill))
+        warnings = validate_skill(path)
+        assert isinstance(warnings, list)

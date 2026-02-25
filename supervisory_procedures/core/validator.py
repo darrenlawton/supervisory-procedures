@@ -85,6 +85,11 @@ def validate_skill(
     return warnings
 
 
+def _step_id(step: dict[str, Any]) -> str:
+    """Return the effective step ID — explicit id if present, else the activity id."""
+    return step.get("id") or step.get("activity", "?")
+
+
 def _collect_warnings(path: Path, data: dict[str, Any]) -> list[ValidationWarning]:
     warnings: list[ValidationWarning] = []
     meta = data.get("metadata", {})
@@ -110,19 +115,34 @@ def _collect_warnings(path: Path, data: dict[str, Any]) -> list[ValidationWarnin
                 ValidationWarning(path, "status is 'approved' but approved_by is null")
             )
 
-    # Cross-reference: workflow step activity IDs must exist in scope.approved_activities
-    approved_ids = {a["id"] for a in data.get("scope", {}).get("approved_activities", []) if isinstance(a, dict)}
+    # Cross-reference: workflow step activity IDs must exist in approved_activities
+    approved_ids = {a["id"] for a in data.get("approved_activities", []) if isinstance(a, dict)}
     for step in data.get("workflow", {}).get("steps", []):
         activity = step.get("activity", "")
         if activity and activity not in approved_ids:
             warnings.append(ValidationWarning(
                 path,
-                f"Workflow step '{step.get('id', '?')}': activity '{activity}' not found in scope.approved_activities",
+                f"Workflow step '{_step_id(step)}': activity '{activity}' not found in approved_activities",
+            ))
+
+    # Rec 10: activation: step requires the control point to be referenced by a workflow step
+    referenced_cps = {
+        step.get("control_point")
+        for step in data.get("workflow", {}).get("steps", [])
+        if step.get("control_point")
+    }
+    for cp in data.get("control_points", []):
+        if cp.get("activation") == "step" and cp["id"] not in referenced_cps:
+            warnings.append(ValidationWarning(
+                path,
+                f"Control point '{cp['id']}' has activation: step but is not referenced "
+                f"by any workflow step via control_point",
             ))
 
     # Staleness check: only applies to directory-based skill.yml files
     if path.name == "skill.yml":
         warnings.extend(_check_skill_md_freshness(path, data))
+        warnings.extend(_check_artifact_consistency(path, data))
 
     return warnings
 
@@ -149,6 +169,82 @@ def _check_skill_md_freshness(path: Path, data: dict[str, Any]) -> list[Validati
         )]
 
     return []
+
+
+def _check_artifact_consistency(path: Path, data: dict[str, Any]) -> list[ValidationWarning]:
+    """Warn on inconsistencies between skill.yml declarations and supporting artifacts.
+
+    Checks:
+    1. Escalation contacts in control points vs resources/escalation_contacts.md
+    2. Applicable regulations vs resources/regulations.md headings/references
+    3. Shared skill existence for workflow steps that use uses_skill
+    4. Unreferenced scripts in scripts/
+    """
+    warnings: list[ValidationWarning] = []
+    skill_dir = path.parent
+    registry_root = path.parent.parent.parent  # registry/<area>/<skill>/skill.yml
+
+    # 1. Escalation contacts
+    escalation_contacts_path = skill_dir / "resources" / "escalation_contacts.md"
+    if escalation_contacts_path.exists():
+        contacts_text = escalation_contacts_path.read_text().lower()
+        for cp in data.get("control_points", []):
+            contact = cp.get("escalation_contact", "")
+            if contact and contact.lower() not in contacts_text:
+                warnings.append(ValidationWarning(
+                    path,
+                    f"Control point '{cp['id']}' escalation_contact '{contact}' "
+                    f"not found in resources/escalation_contacts.md",
+                ))
+
+    # 2. Applicable regulations vs resources/regulations.md
+    regulations_path = skill_dir / "resources" / "regulations.md"
+    if regulations_path.exists():
+        regs_text = regulations_path.read_text()
+        for reg in data.get("context", {}).get("applicable_regulations", []):
+            # Check for a keyword from the regulation string (first meaningful token)
+            keyword = reg.split("—")[0].strip().split()[0] if reg else ""
+            if keyword and keyword.lower() not in regs_text.lower():
+                warnings.append(ValidationWarning(
+                    path,
+                    f"Regulation '{reg}' from context.applicable_regulations has no matching "
+                    f"reference in resources/regulations.md",
+                ))
+
+    # 3. Shared skill existence for uses_skill references
+    for step in data.get("workflow", {}).get("steps", []):
+        uses = step.get("uses_skill", "")
+        if uses:
+            shared_dir = registry_root / uses
+            if not shared_dir.exists():
+                warnings.append(ValidationWarning(
+                    path,
+                    f"Workflow step '{_step_id(step)}': uses_skill '{uses}' "
+                    f"does not exist in registry/",
+                ))
+
+    # 4. Unreferenced scripts
+    scripts_dir = skill_dir / "scripts"
+    if scripts_dir.exists():
+        declared_scripts: set[str] = set()
+        for artifact_script in data.get("artifacts", {}).get("scripts", []):
+            declared_scripts.add(artifact_script.get("file", ""))
+
+        referenced_in_activities = set()
+        for activity in data.get("approved_activities", []):
+            aid = activity.get("id", "")
+            if aid:
+                referenced_in_activities.add(aid.replace("-", "_") + ".py")
+
+        for script_file in scripts_dir.glob("*.py"):
+            name = script_file.name
+            if name not in declared_scripts and name not in referenced_in_activities:
+                warnings.append(ValidationWarning(
+                    path,
+                    f"scripts/{name} is not referenced by any activity id or declared in artifacts.scripts",
+                ))
+
+    return warnings
 
 
 def validate_directory(

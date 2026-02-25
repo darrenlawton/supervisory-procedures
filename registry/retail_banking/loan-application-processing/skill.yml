@@ -1,8 +1,8 @@
 metadata:
   id: retail_banking/loan-application-processing
   name: Loan Application Processing
-  version: 2.0.0
-  schema_version: "2.0"
+  version: 2.1.0
+  schema_version: "2.1"
   business_area: retail_banking
   type: standard
   supervisor:
@@ -33,20 +33,19 @@ context:
     - "Equality Act 2010 — Protected characteristics"
   risk_classification: high
 
-scope:
-  approved_activities:
-    - id: retrieve-documents
-      description: Retrieve and parse submitted application documents (proof of income, ID)
-    - id: credit-score
-      description: Query the internal credit scoring system for the applicant's risk score
-    - id: sanctions-screening
-      description: Cross-reference applicant details against the sanctions screening database
-    - id: calculate-dti
-      description: Calculate debt-to-income ratio using declared and verified income figures
-    - id: generate-recommendation
-      description: Generate a structured recommendation report for the human underwriter
-    - id: send-notification
-      description: Send templated acknowledgement and status-update emails to the applicant
+approved_activities:
+  - id: retrieve-documents
+    description: Retrieve and parse submitted application documents (proof of income, ID)
+  - id: credit-score
+    description: Query the internal credit scoring system for the applicant's risk score
+  - id: sanctions-screening
+    description: Cross-reference applicant details against the sanctions screening database
+  - id: calculate-dti
+    description: Calculate debt-to-income ratio using declared and verified income figures
+  - id: generate-recommendation
+    description: Generate a structured recommendation report for the human underwriter
+  - id: send-notification
+    description: Send templated acknowledgement and status-update emails to the applicant
 
 constraints:
   procedural_requirements:
@@ -64,101 +63,96 @@ control_points:
   # --- vetoed: agent halts unconditionally, no human override ---
 
   - id: sanctions-match
-    name: Sanctions List Match
     description: >
       A positive match was returned when the applicant's name and date of birth
       were checked against the HM Treasury or OFAC consolidated sanctions lists.
       Processing must halt immediately and be escalated to the Financial Crime team.
     classification: vetoed
-    trigger_condition: >
+    activation: conditional
+    trigger: >
       Positive match returned from HM Treasury or OFAC sanctions screening with
       match_confidence >= 0.85 or exact_match == true.
-    condition_hint: >
-      sanctions_screening_result.match_confidence >= 0.85 OR
-      sanctions_screening_result.exact_match == true
     escalation_contact: financial-crime-team@bank.example.com
 
   - id: identity-verification-failure
-    name: Identity Verification Failure
     description: >
       The agent cannot verify the applicant's identity against two independent
       sources after exhausting available verification methods. Processing must
       halt and the underwriting team must be notified.
     classification: vetoed
-    trigger_condition: >
+    activation: conditional
+    trigger: >
       Agent has exhausted all available identity verification methods and cannot
       confirm the applicant's identity against two independent sources.
     escalation_contact: underwriting-team@bank.example.com
 
   - id: data-quality-critical
-    name: Critical Data Quality Failure
     description: >
       Critical data required for a compliant creditworthiness assessment is
       missing or cannot be retrieved (e.g. credit bureau unavailable, income
       documents unreadable). Processing must halt and the underwriting team
       must be notified.
     classification: vetoed
-    trigger_condition: >
+    activation: conditional
+    trigger: >
       Critical required fields are missing or external services return errors
       that prevent a compliant assessment from being completed.
-    condition_hint: required_fields_missing.count > 0 OR external_service_errors.critical == true
     escalation_contact: underwriting-team@bank.example.com
 
   - id: protected-characteristic-detected
-    name: Protected Characteristic Detected
     description: >
       A data source or scoring model attempts to supply a protected characteristic
       (age band excepted by FCA) as a model feature. Processing must halt
       immediately and be escalated to Ethics and Compliance.
     classification: vetoed
-    trigger_condition: >
+    activation: conditional
+    trigger: >
       A data source or scoring model exposes a protected characteristic
       (e.g. ethnicity, religion, gender, disability) as a model input feature.
-    condition_hint: feature_flags.contains_protected_characteristic == true
     escalation_contact: ethics-and-compliance@bank.example.com
 
   # --- auto: agent proceeds without human involvement ---
 
   - id: identity-verified
-    name: Identity Verification Complete
     description: >
       Confirms that the applicant's identity has been successfully verified
       against two independent sources. The agent proceeds automatically on a
       confirmed dual-source match; the identity-verification-failure control
       point halts processing if verification cannot be completed.
     classification: auto
+    activation: step
 
   # --- needs_approval: explicit human sign-off required before agent continues ---
 
   - id: creditworthiness-assessment-review
-    name: Creditworthiness Assessment Review
     description: >
       Human underwriter reviews the agent's structured recommendation report,
       including credit score, debt-to-income ratio, and supporting documentation,
       and provides explicit sign-off before any decision is communicated.
     classification: needs_approval
+    activation: step
     who_reviews: Qualified underwriter (minimum Grade 3 accreditation)
     sla_hours: 24
 
   - id: high-value-application
-    name: High-Value Loan Application Review
     description: >
       Loan applications above the high-value threshold require dual-approval:
       both a qualified underwriter and the Head of Consumer Credit must sign off
       before a decision is communicated to the applicant.
     classification: needs_approval
-    trigger_condition: Requested loan amount exceeds £50,000.
+    activation: conditional
+    trigger: Requested loan amount exceeds £50,000.
     who_reviews: Underwriter + Head of Consumer Credit
     sla_hours: 48
 
   - id: suspected-fraud-indicators
-    name: Fraud Indicators Detected
     description: >
       Two or more fraud indicator flags have been raised during document
       verification. Processing halts and the application is referred to the
       Financial Crime team for manual investigation before any further action.
     classification: needs_approval
-    trigger_condition: >
+    activation: conditional
+    trigger: >
       Two or more fraud indicator flags are raised during document verification
       (e.g. inconsistent employment records, mismatched address history, altered document metadata).
     who_reviews: Financial Crime Investigation Team
@@ -167,24 +161,24 @@ control_points:
   # --- notify: human is informed but not blocked ---
 
   - id: decision-communication
-    name: Lending Decision Communication
     description: >
       After underwriter approval, notifies the applicant of the lending decision
       via templated email. Declined applications include a reason code so the
       customer can request a manual review.
     classification: notify
+    activation: step
     who_reviews: Underwriter (approved the decision)
 
   # --- review: human reviews and can flag issues before agent continues ---
 
   - id: borderline-credit-score
-    name: Borderline Credit Score — Senior Review
     description: >
       Applications with borderline credit scores require review by a senior
       underwriter to ensure consistent application of lending policy before
       the recommendation is finalised.
     classification: review
-    trigger_condition: >
+    activation: conditional
+    trigger: >
       Applicant credit score falls within the borderline band (580–640)
       as defined in the current underwriting policy.
     who_reviews: Senior underwriter (Grade 5+)
@@ -192,43 +186,35 @@ control_points:
 
 workflow:
   steps:
-    - id: retrieve-documents
-      activity: retrieve-documents
+    - activity: retrieve-documents
       control_point: identity-verified
 
-    - id: sanctions-screening
-      activity: sanctions-screening
+    - activity: sanctions-screening
 
-    - id: credit-score
-      activity: credit-score
+    - activity: credit-score
 
-    - id: calculate-dti
-      activity: calculate-dti
+    - activity: calculate-dti
 
     - id: send-progress-notification
       activity: send-notification
 
-    - id: generate-recommendation
-      activity: generate-recommendation
+    - activity: generate-recommendation
       control_point: creditworthiness-assessment-review
 
     - id: notify-applicant-decision
       activity: send-notification
       control_point: decision-communication
 
-helper_skills:
-  - id: shared/audit-logging
-    purpose: >
-      Writes timestamped audit trail entries at every data access and workflow
-      transition, satisfying the ICO UK GDPR Article 22 and FCA audit requirements.
-    required: true
-  - id: shared/checkpoint-gate
-    purpose: >
-      Enforces human underwriter review checkpoints and vetoed escalations
-      (sanctions match, identity failure, protected characteristics) at runtime.
-    required: true
-  - id: shared/validate-activity
-    purpose: >
-      Verifies every proposed agent action against the approved_activities
-      allowlist before execution, enforcing scope boundaries at runtime.
-    required: true
+artifacts:
+  resources:
+    - file: regulations.md
+      description: Detailed regulatory obligations and agent-specific guidance for each applicable regulation
+    - file: escalation_contacts.md
+      description: Contact directory for underwriting team and financial crime escalations
+  scripts:
+    - file: sanctions_check.py
+      description: Wraps the HM Treasury and OFAC sanctions screening API for applicant name and DOB matching
+      used_by_activity: sanctions-screening
+    - file: identity_verify.py
+      description: Cross-references applicant identity documents against two independent verification sources
+      used_by_activity: retrieve-documents

@@ -6,7 +6,7 @@ description: "AI-assisted first-pass review of sanctions screening and Political
 # Sanctions and PEP Alert Review
 
 > **Governed Skill** — Supervisor: Head of Financial Crime Compliance (Head of Financial Crime Compliance)
-> Risk: **critical** | Version: 2.0.0 | Regulations: BSA/AML — Bank Secrecy Act / Anti-Money Laundering | OFAC — US Office of Foreign Assets Control sanctions regulations | HM Treasury — UK Consolidated Sanctions List | EU Consolidated Sanctions List | FinCEN — Joint Statement on Innovative Efforts to Combat Money Laundering (2018) | Fed/OCC SR 11-7 — Model Risk Management framework | ECOA — Equal Credit Opportunity Act (fairness in decisioning) | FATF Recommendations — Politically Exposed Persons
+> Risk: **critical** | Version: 2.1.0 | Regulations: BSA/AML — Bank Secrecy Act / Anti-Money Laundering | OFAC — US Office of Foreign Assets Control sanctions regulations | HM Treasury — UK Consolidated Sanctions List | EU Consolidated Sanctions List | FinCEN — Joint Statement on Innovative Efforts to Combat Money Laundering (2018) | Fed/OCC SR 11-7 — Model Risk Management framework | ECOA — Equal Credit Opportunity Act (fairness in decisioning) | FATF Recommendations — Politically Exposed Persons
 
 *All steps, controls, and restrictions below are defined by your supervisor. Follow this procedure exactly.*
 
@@ -72,7 +72,6 @@ If any of these conditions arise, invoke the checkpoint immediately and halt. No
 The customer's full name and at least one additional identifier match an entry on a major sanctions list with high confidence, and link traversal has not produced evidence sufficient to refute the match. Processing must halt immediately and be escalated to the Financial Crime team.
 
 **Trigger:** Customer name and at least one additional identifier (date of birth, nationality, or address) match an OFAC SDN, HM Treasury, or EU Consolidated Sanctions List entry with confidence >= 0.90, exact or alias name match, and the match has not been refuted by evidence.
-**Condition hint:** `sanctions_hit.confidence >= 0.90 AND (sanctions_hit.name_match == "exact" OR sanctions_hit.alias_match == "exact") AND sanctions_hit.refuted_by_evidence == false`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -84,12 +83,11 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # Exit code 2 — halt all processing immediately.
 ```
 
-### confidence-below-threshold — Recommendation Confidence Below Threshold
+### confidence-below-threshold — Confidence Below Threshold
 
 The agent's overall confidence in its recommendation falls below the minimum acceptable threshold, indicating insufficient evidence to classify the alert as either a clear false positive or a confirmed match. Processing must halt and be escalated to the Financial Crime team.
 
 **Trigger:** Agent's overall recommendation confidence score falls below the minimum acceptable threshold, indicating insufficient evidence to classify the alert.
-**Condition hint:** `recommendation_confidence_score < 0.70`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -101,12 +99,11 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # Exit code 2 — halt all processing immediately.
 ```
 
-### active-criminal-investigation-found — Active Criminal Investigation Detected
+### active-criminal-investigation-found — Active Criminal Investigation Found
 
 Adverse media or open-source evidence indicates that the customer is the subject of an active law enforcement investigation, criminal prosecution, or regulatory enforcement action. Processing must halt immediately.
 
 **Trigger:** Adverse media or open-source results indicate an active law enforcement investigation, criminal prosecution, or regulatory enforcement action involving the customer.
-**Condition hint:** `adverse_media_results.active_investigation == true OR adverse_media_results.criminal_prosecution == true`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -118,12 +115,11 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # Exit code 2 — halt all processing immediately.
 ```
 
-### conflicting-evidence-on-high-risk-hit — Unresolvable Conflicting Evidence on High-Risk Hit
+### conflicting-evidence-on-high-risk-hit — Conflicting Evidence On High Risk Hit
 
 Multiple evidence sources return conflicting conclusions on a high-risk sanctions or PEP hit, and the conflict cannot be resolved by further link traversal within the agent's permitted data sources. Processing must halt.
 
 **Trigger:** A high-risk hit has conflicting evidence across sources (e.g. one source indicates deceased, another indicates active) and link traversal has been exhausted without resolving the conflict.
-**Condition hint:** `hit.risk_level == "high" AND evidence_sources.conflict_detected == true AND link_traversal_exhausted == true`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -135,12 +131,11 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # Exit code 2 — halt all processing immediately.
 ```
 
-### data-source-unavailable — Mandatory Data Source Unavailable
+### data-source-unavailable — Data Source Unavailable
 
 One or more mandatory data sources (OFAC, HM Treasury, PEP database) are unavailable or return an error, preventing the agent from completing the required SOP checklist steps. Processing must halt until data sources are restored.
 
 **Trigger:** One or more mandatory data sources (OFAC SDN list, HM Treasury Consolidated List, or PEP database) are unavailable or returning errors.
-**Condition hint:** `mandatory_data_sources.any_unavailable == true`
 
 ```bash
 python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
@@ -196,7 +191,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 
 These activate when their trigger condition is met during any workflow step.
 
-### partial-match-senior-review — Partial Match — Senior Compliance Review
+### partial-match-senior-review — Partial Match Senior Review
 
 Classification: **needs_approval** | Reviewer: Senior compliance officer (BSA/AML, Grade 5+) | SLA: 4h
 
@@ -215,7 +210,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # PENDING — halt here and await explicit approval before continuing.
 ```
 
-### model-accuracy-deviation — Model Accuracy Deviation Alert
+### model-accuracy-deviation — Model Accuracy Deviation
 
 Classification: **notify** | Reviewer: AI Operations Team and Model Risk Committee
 
@@ -233,7 +228,7 @@ python registry/shared/checkpoint-gate/scripts/checkpoint_gate.py \
 # NOTIFY — human is informed; agent may continue.
 ```
 
-### novel-typology-detected — Novel Threat Typology Detected
+### novel-typology-detected — Novel Typology Detected
 
 Classification: **notify** | Reviewer: Financial Crime Intelligence Team and AI Operations Team | SLA: 24h
 

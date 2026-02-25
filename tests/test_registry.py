@@ -101,7 +101,7 @@ class TestSkillRegistryGetSkill:
         reg = SkillRegistry()
         skill = reg.get_skill("retail_banking/loan-application-processing")
         assert "context" in skill
-        assert "scope" in skill
+        assert "approved_activities" in skill
         assert "constraints" in skill
         assert "control_points" in skill
 
