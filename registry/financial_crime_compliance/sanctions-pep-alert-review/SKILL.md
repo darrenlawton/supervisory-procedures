@@ -1,6 +1,12 @@
 ---
 name: sanctions-pep-alert-review
-description: "AI-assisted first-pass review of sanctions screening and Politically Exposed Person (PEP) alerts generated during customer onboarding and ongoing monitoring. The agent works through the compliance team's standard operating procedure checklist, presents a structured recommendation (Accept / Decline / Partial Match), and hands off to a human compliance officer for final disposition. The agent does not make binding decisions — it prepares the evidence package and proposes a recommendation under the four-eyes principle. Use when Sanctions and PEP Alert Review is needed for financial crime compliance operations. Risk: critical. Authorised agents: sanctions-review-agent-prod, sanctions-review-agent-staging."
+description: "AI-assisted first-pass review of sanctions screening and Politically Exposed Person (PEP) alerts generated during customer onboarding and ongoing monitoring. The agent works through the compliance team's standard operating procedure checklist, presents a structured recommendation (Accept / Decline / Partial Match), and hands off to a human compliance officer for final disposition. The agent does not make binding decisions — it prepares the evidence package and proposes a recommendation under the four-eyes principle. Use when Sanctions and PEP Alert Review is needed for financial crime compliance operations. Risk: critical."
+allowed-tools: "Bash(python:*)"
+compatibility: "Requires Python 3.11+ runtime with shared enforcement scripts (audit-logging, checkpoint-gate, validate-activity). Target: Claude API. Risk: critical. Regulatory scope: 8 regulation(s)."
+metadata:
+  author: Head of Financial Crime Compliance
+  version: 2.1.0
+  category: financial crime compliance
 ---
 
 # Sanctions and PEP Alert Review

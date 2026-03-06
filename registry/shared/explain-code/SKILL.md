@@ -4,6 +4,7 @@ description: >
   Explains code with visual ASCII diagrams and plain-language analogies.
   Use when explaining how code works, teaching about a codebase architecture,
   or when someone asks "how does this work?" or "walk me through this."
+compatibility: "No runtime dependencies. Target: Claude.ai, Claude Code, Claude API."
 ---
 
 # Explain Code

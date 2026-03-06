@@ -1,6 +1,12 @@
 ---
 name: loan-application-processing
-description: "AI-assisted processing of personal loan applications. The agent reviews submitted documentation, runs automated eligibility checks, prepares a recommendation for the underwriter, and communicates decisions to applicants. Use when Loan Application Processing is needed for retail banking operations. Risk: high. Authorised agents: loan-processor-agent-prod, loan-processor-agent-staging."
+description: "AI-assisted processing of personal loan applications. The agent reviews submitted documentation, runs automated eligibility checks, prepares a recommendation for the underwriter, and communicates decisions to applicants. Use when Loan Application Processing is needed for retail banking operations. Risk: high."
+allowed-tools: "Bash(python:*)"
+compatibility: "Requires Python 3.11+ runtime with shared enforcement scripts (audit-logging, checkpoint-gate, validate-activity). Target: Claude API. Risk: high. Regulatory scope: 4 regulation(s)."
+metadata:
+  author: Sarah Johnson
+  version: 2.1.0
+  category: retail banking
 ---
 
 # Loan Application Processing

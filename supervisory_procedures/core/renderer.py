@@ -120,16 +120,53 @@ def _frontmatter(skill_data: dict[str, Any]) -> str:
     area = meta.get("business_area", "").replace("_", " ")
     skill_name = meta.get("name", "")
     risk = ctx.get("risk_classification", "")
-    agents = ", ".join(meta.get("authorised_agents", []))
 
     use_when = f"Use when {skill_name} is needed for {area} operations."
-    suffix = f" {use_when} Risk: {risk}. Authorised agents: {agents}."
+    suffix = f" {use_when} Risk: {risk}."
 
     if len(raw_desc) + len(suffix) > _MAX_DESCRIPTION:
         raw_desc = raw_desc[: _MAX_DESCRIPTION - len(suffix) - 3] + "..."
 
     description = raw_desc + suffix
-    return f'---\nname: {name}\ndescription: "{description}"\n---\n'
+
+    # allowed-tools: author-specified override or default to Python enforcement scripts only
+    allowed_tools = meta.get("allowed_tools", "Bash(python:*)")
+
+    # compatibility: runtime requirements + risk level, max 500 chars
+    reg_count = len(ctx.get("applicable_regulations", []))
+    compat = (
+        f"Requires Python 3.11+ runtime with shared enforcement scripts "
+        f"(audit-logging, checkpoint-gate, validate-activity). "
+        f"Target: Claude API. Risk: {risk}."
+    )
+    if reg_count:
+        compat += f" Regulatory scope: {reg_count} regulation(s)."
+    if len(compat) > 500:
+        compat = compat[:497] + "..."
+
+    # metadata block: supervisor, version, business area
+    sup = meta.get("supervisor", {})
+    author = sup.get("name", "")
+    version = meta.get("version", "")
+    category = area
+
+    lines = [
+        "---",
+        f"name: {name}",
+        f'description: "{description}"',
+        f'allowed-tools: "{allowed_tools}"',
+        f'compatibility: "{compat}"',
+    ]
+    if author or version or category:
+        lines.append("metadata:")
+        if author:
+            lines.append(f"  author: {author}")
+        if version:
+            lines.append(f"  version: {version}")
+        if category:
+            lines.append(f"  category: {category}")
+    lines += ["---", ""]
+    return "\n".join(lines)
 
 
 def _header(skill_data: dict[str, Any]) -> str:

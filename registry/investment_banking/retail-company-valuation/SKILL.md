@@ -1,6 +1,12 @@
 ---
 name: retail-company-valuation
-description: "AI-assisted construction of valuation models for publicly listed and private retail sector companies. The agent assembles comparable company analysis (comps), discounted cash flow (DCF) inputs, and LBO model parameters from internal and approved external data sources. Use when Retail Company Valuation Model is needed for investment banking operations. Risk: high. Authorised agents: ib-valuation-agent-prod."
+description: "AI-assisted construction of valuation models for publicly listed and private retail sector companies. The agent assembles comparable company analysis (comps), discounted cash flow (DCF) inputs, and LBO model parameters from internal and approved external data sources. Use when Retail Company Valuation Model is needed for investment banking operations. Risk: high."
+allowed-tools: "Bash(python:*)"
+compatibility: "Requires Python 3.11+ runtime with shared enforcement scripts (audit-logging, checkpoint-gate, validate-activity). Target: Claude API. Risk: high. Regulatory scope: 3 regulation(s)."
+metadata:
+  author: Your Full Name
+  version: 2.1.0
+  category: investment banking
 ---
 
 # Retail Company Valuation Model
