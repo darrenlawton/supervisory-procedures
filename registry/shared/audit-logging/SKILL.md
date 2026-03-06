@@ -5,7 +5,9 @@ description: >
   Use when an agent needs to record a data access, decision step, or workflow
   event to the persistent audit trail. Provides append-only logging with
   session correlation and JSON-structured output.
-user-invocable: false
+allowed-tools: "Bash(python:*)"
+compatibility: "Requires Python 3.11+ runtime. Target: Claude API. Called by generated SKILL.md enforcement scripts; not intended for direct user invocation."
+disable-model-invocation: true
 ---
 
 # Audit Logging

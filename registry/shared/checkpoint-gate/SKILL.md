@@ -5,7 +5,9 @@ description: >
   Accepts a --classification argument matching the control_points classification:
   auto, notify, review, needs_approval, or vetoed. Writes a record to the control
   point log and signals the agent whether to proceed or halt.
-user-invocable: false
+allowed-tools: "Bash(python:*)"
+compatibility: "Requires Python 3.11+ runtime. Target: Claude API. Called by generated SKILL.md enforcement scripts; not intended for direct user invocation."
+disable-model-invocation: true
 ---
 
 # Checkpoint Gate

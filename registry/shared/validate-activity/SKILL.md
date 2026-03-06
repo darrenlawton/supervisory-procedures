@@ -4,7 +4,9 @@ description: >
   Validates that a workflow step is within the approved scope for the current
   skill. Use before performing any step to enforce the scope boundary. Reads
   the workflow definition from the skill's skill.yml file.
-user-invocable: false
+allowed-tools: "Bash(python:*)"
+compatibility: "Requires Python 3.11+ runtime with PyYAML. Target: Claude API. Called by generated SKILL.md enforcement scripts; not intended for direct user invocation."
+disable-model-invocation: true
 ---
 
 # Validate Activity

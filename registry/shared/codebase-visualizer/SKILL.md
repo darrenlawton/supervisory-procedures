@@ -4,7 +4,8 @@ description: >
   Generates an interactive, collapsible HTML tree visualisation of a codebase.
   Use when exploring a new repository, understanding project structure, or
   identifying large files and hotspots. Opens the result in the default browser.
-allowed-tools: Bash(python *)
+allowed-tools: "Bash(python:*)"
+compatibility: "Requires Python 3.11+ standard library (no third-party packages). Target: Claude Code, Claude API."
 ---
 
 # Codebase Visualizer

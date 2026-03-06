@@ -96,6 +96,11 @@
           "items": { "type": "string", "minLength": 1 },
           "minItems": 1,
           "description": "Agent IDs allowed to load this skill. ['*'] is permitted but triggers a CI warning."
+        },
+        "allowed_tools": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional. Override the SKILL.md allowed-tools frontmatter field. Uses Claude Agent Skills syntax, e.g. 'Bash(python:*) Read'. Defaults to 'Bash(python:*)' if omitted."
         }
       }
     },
