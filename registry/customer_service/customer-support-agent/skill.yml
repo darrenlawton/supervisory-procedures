@@ -184,7 +184,8 @@ control_points:
 
 workflow:
   steps:
-    - activity: route-request
+    - id: route-request
+      activity: route-request
 
     # Lookup subgraph path
     - id: lookup-music
@@ -201,7 +202,8 @@ workflow:
       condition: "route == 'refund'"
       control_point: refund-approval
 
-    - activity: generate-response
+    - id: generate-response
+      activity: generate-response
       control_point: response-quality-gate
 
 artifacts:
