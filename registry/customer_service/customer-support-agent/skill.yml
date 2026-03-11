@@ -190,16 +190,13 @@ workflow:
     # Lookup subgraph path
     - id: lookup-music
       activity: lookup-music
-      condition: "route == 'lookup'"
 
     # Refund subgraph path
     - id: verify-purchase
       activity: verify-purchase
-      condition: "route == 'refund'"
 
     - id: process-refund
       activity: process-refund
-      condition: "route == 'refund'"
       control_point: refund-approval
 
     - id: generate-response
