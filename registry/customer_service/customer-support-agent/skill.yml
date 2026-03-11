@@ -1,0 +1,313 @@
+metadata:
+  id: customer_service/customer-support-agent
+  name: Customer Support Agent
+  version: 1.0.0
+  schema_version: "2.1"
+  business_area: customer_service
+  type: standard
+  supervisor:
+    name: Maria Chen
+    email: maria.chen@example.com
+    role: Head of Customer Experience
+  status: approved
+  created_at: "2026-03-11"
+  approved_at: "2026-03-11"
+  approved_by: customer-experience-governance-board
+  authorised_agents:
+    - customer-support-agent-prod
+    - customer-support-agent-staging
+
+context:
+  description: >
+    AI-assisted handling of inbound customer support tickets across email, chat,
+    and web form channels. The agent triages incoming requests, retrieves account
+    information, searches the knowledge base for resolutions, drafts responses,
+    and escalates issues that exceed its authorised resolution scope. The agent
+    does not send communications or apply account changes autonomously — all
+    outbound messages and account modifications require either automated policy
+    validation (for standard responses) or explicit human agent approval (for
+    compensation, refunds, and account-level changes).
+  business_rationale: >
+    AI assistance reduces average handle time for Tier-1 support tickets from
+    ~8 minutes to ~90 seconds, enabling human agents to focus on complex,
+    sensitive, and high-value interactions. The skill is designed around a
+    trajectory-based evaluation framework: each step in the workflow is
+    individually assessable, allowing partial-credit scoring when the agent
+    completes some correct steps even if it cannot fully resolve the issue.
+    This mirrors the LangSmith trajectory evaluation model for complex agents,
+    where intermediate correctness matters as much as final output quality.
+  applicable_regulations:
+    - "UK Consumer Duty (FCA PS22/9) — Customer outcomes and fair treatment"
+    - "UK GDPR / Data Protection Act 2018 — Customer data access and retention"
+    - "Consumer Rights Act 2015 — Refund and remedy obligations"
+    - "FCA DISP — Complaints handling rules"
+    - "PCI DSS — Payment card data handling"
+    - "Equality Act 2010 — Reasonable adjustments and non-discrimination"
+  risk_classification: medium
+
+approved_activities:
+  - id: classify-ticket
+    description: >
+      Classify the inbound ticket by type (billing, technical, account, returns,
+      complaints) and priority (low, medium, high, urgent) using the standard
+      taxonomy. Assign an initial sentiment score.
+  - id: retrieve-account
+    description: >
+      Retrieve the customer's account record, order history, and prior support
+      interactions from the CRM system, scoped to information relevant to the
+      current ticket.
+  - id: search-knowledge-base
+    description: >
+      Search the internal knowledge base and approved resolution playbooks for
+      solutions matching the ticket category and customer context.
+  - id: run-eligibility-check
+    description: >
+      Evaluate the customer's eligibility for standard resolutions (e.g. refund
+      policy window, warranty status, subscription tier entitlements) against
+      defined policy rules.
+  - id: draft-response
+    description: >
+      Draft a customer-facing response using the approved tone-of-voice guidelines,
+      populated with ticket-specific details and the proposed resolution or
+      next-step instructions.
+  - id: apply-standard-resolution
+    description: >
+      Apply a policy-defined standard resolution (e.g. issue a prepaid return
+      label, unlock a locked account, resend a confirmation email) where eligibility
+      has been confirmed and no human approval is required under current policy.
+  - id: generate-escalation-summary
+    description: >
+      Produce a structured escalation brief for the human agent including: ticket
+      summary, account context, steps already taken, confidence score, and
+      recommended next action.
+  - id: log-interaction
+    description: >
+      Record the full interaction trajectory — classifications, data sources queried,
+      draft responses generated, resolutions applied, and control points triggered —
+      to the CRM audit trail.
+  - id: send-response
+    description: >
+      Send the approved customer-facing response via the ticket's originating
+      channel (email, chat, or web form) after human or policy gate approval.
+  - id: close-ticket
+    description: >
+      Mark the ticket as resolved in the CRM, set the appropriate resolution code,
+      and trigger the post-interaction customer satisfaction survey.
+
+constraints:
+  procedural_requirements:
+    - Always retrieve the customer's account record before drafting any response or applying any resolution
+    - Apply the standard triage classification before any other action on a new ticket
+    - Log every step of the interaction trajectory to the CRM audit trail, including all control points triggered
+    - Use only approved response templates and tone-of-voice guidelines when drafting customer communications
+    - Confirm eligibility against policy rules before applying any resolution, even a standard one
+  unacceptable_actions:
+    - Send any customer-facing communication without first passing it through the response quality gate
+    - Apply account changes (credits, refunds, closures, tier changes) without human agent approval
+    - Access customer data beyond what is required to resolve the current ticket
+    - Share customer account data with any channel, tool, or party not listed in the data processing agreement
+    - Retain personal data or ticket content beyond the retention period defined in the data governance policy
+    - Use demographic characteristics (age, ethnicity, disability, religion) as inputs to priority scoring or resolution selection
+    - Fabricate information or invent resolution options not supported by the knowledge base or approved playbooks
+    - Suppress, edit, or omit entries from the CRM audit trail
+
+control_points:
+  # --- vetoed: agent halts unconditionally, no human override ---
+
+  - id: unsafe-content-detected
+    description: >
+      The inbound ticket or agent-generated content contains material that may
+      indicate a safeguarding concern, threat of violence, or self-harm. Processing
+      must halt immediately and be escalated to the Safeguarding and Risk team.
+    classification: vetoed
+    activation: conditional
+    trigger: >
+      Ticket content or generated response contains language classified as a
+      safeguarding concern, credible threat of violence, or expression of
+      self-harm intent (classifier confidence >= 0.80).
+    escalation_contact: safeguarding-risk@example.com
+
+  - id: regulated-complaint-detected
+    description: >
+      The ticket meets the FCA DISP definition of a regulated complaint — an
+      expression of dissatisfaction about a financial product or service. Standard
+      support handling must halt and the ticket must be routed to the Complaints
+      team, who will follow the regulated complaints procedure.
+    classification: vetoed
+    activation: conditional
+    trigger: >
+      Ticket is classified as a regulated complaint under FCA DISP rules: an
+      oral or written expression of dissatisfaction about the firm's financial
+      services or products, where redress or remediation is sought.
+    escalation_contact: complaints-team@example.com
+
+  - id: data-access-scope-breach
+    description: >
+      The agent has attempted to access or retrieve customer data outside the
+      scope of the current ticket (e.g. querying a different account, accessing
+      payment card numbers, or retrieving historical data beyond the lookback window).
+      Processing must halt immediately and be escalated to the Data Protection team.
+    classification: vetoed
+    activation: conditional
+    trigger: >
+      An attempted data access operation falls outside the permitted scope for the
+      current ticket: different account identity, prohibited data fields (full PAN,
+      CVV, full date of birth), or lookback window exceeding policy limits.
+    escalation_contact: data-protection@example.com
+
+  # --- needs_approval: explicit human sign-off required before agent continues ---
+
+  - id: compensation-approval
+    description: >
+      Resolutions involving financial compensation, goodwill credit, or refunds
+      above the standard policy threshold require explicit approval from a human
+      agent before any commitment is made to the customer.
+    classification: needs_approval
+    activation: conditional
+    trigger: >
+      The proposed resolution involves a refund, credit, or compensation amount
+      exceeding the standard policy threshold (£25 for credits; any refund not
+      covered by the 30-day no-quibble return policy).
+    who_reviews: Customer Support Team Leader
+    sla_hours: 4
+
+  - id: account-change-approval
+    description: >
+      Any modification to the customer's account (subscription changes, account
+      closure, access restriction removal, tier upgrade/downgrade) requires
+      explicit human approval before being applied.
+    classification: needs_approval
+    activation: conditional
+    trigger: >
+      The proposed resolution requires a change to the customer's account record
+      beyond standard self-service actions (e.g. resending emails, unlocking after
+      failed login attempts within policy limits).
+    who_reviews: Customer Support Agent (Level 2+)
+    sla_hours: 2
+
+  # --- review: human actively reviews before agent continues ---
+
+  - id: response-quality-gate
+    description: >
+      Before any response is sent to the customer, the draft is presented to the
+      human agent for review. The agent checks for accuracy, tone, completeness,
+      and compliance with the approved communication guidelines. The agent can
+      approve, edit, or reject the draft.
+    classification: review
+    activation: step
+    who_reviews: Customer Support Agent
+    sla_hours: 1
+
+  - id: escalation-handoff-review
+    description: >
+      When the agent cannot resolve a ticket within its authorised scope, the
+      escalation summary is reviewed by the receiving human agent to confirm
+      accuracy and completeness before taking ownership of the ticket.
+    classification: review
+    activation: conditional
+    trigger: >
+      The agent determines that the ticket cannot be resolved within its
+      authorised scope and has generated an escalation summary for handoff
+      to a Level 2 agent or specialist team.
+    who_reviews: Customer Support Agent (Level 2+ or Specialist Team)
+    sla_hours: 1
+
+  # --- notify: human is informed but not blocked ---
+
+  - id: high-sentiment-alert
+    description: >
+      When a ticket is classified as high-distress or expresses significant
+      customer frustration, the Team Leader is notified so they can monitor
+      the interaction and intervene if needed. The agent continues with the
+      standard workflow.
+    classification: notify
+    activation: conditional
+    trigger: >
+      Ticket sentiment score falls below the high-distress threshold (< -0.7 on
+      a -1 to +1 scale) or the customer explicitly references escalation, legal
+      action, or social media complaints.
+    who_reviews: Customer Support Team Leader
+
+  - id: sla-breach-risk
+    description: >
+      When a ticket is at risk of breaching its response SLA, the Team Leader
+      is notified to allow manual reprioritisation or resource reallocation.
+      The agent continues processing the ticket.
+    classification: notify
+    activation: conditional
+    trigger: >
+      Ticket has been open for 80% of its SLA window without a response being
+      sent (e.g. 4 hours for a 5-hour SLA ticket).
+    who_reviews: Customer Support Team Leader
+
+  - id: model-performance-deviation
+    description: >
+      When the agent's rolling resolution accuracy or customer satisfaction scores
+      deviate beyond acceptable bounds, the AI Operations team is notified to
+      investigate model drift and initiate retraining if required.
+    classification: notify
+    activation: conditional
+    trigger: >
+      Rolling 7-day resolution accuracy drops below 0.80, or average CSAT score
+      for agent-handled tickets falls below 3.5 out of 5.0.
+    who_reviews: AI Operations Team
+
+  # --- auto: agent proceeds without human involvement ---
+
+  - id: standard-resolution-confirmed
+    description: >
+      Confirms that the proposed resolution is covered by an approved policy rule,
+      the customer meets the eligibility criteria, and the resolution value is within
+      the standard threshold. The agent proceeds to apply the resolution and draft
+      the response without requiring human sign-off.
+    classification: auto
+    activation: step
+
+workflow:
+  steps:
+    - activity: classify-ticket
+
+    - activity: retrieve-account
+
+    - activity: search-knowledge-base
+
+    - activity: run-eligibility-check
+      control_point: standard-resolution-confirmed
+
+    - activity: draft-response
+      control_point: response-quality-gate
+
+    - id: apply-resolution
+      activity: apply-standard-resolution
+
+    - activity: send-response
+
+    - activity: log-interaction
+
+    - activity: close-ticket
+
+artifacts:
+  resources:
+    - file: resolution-playbooks.md
+      description: >
+        Approved resolution playbooks for each ticket category, including
+        eligibility criteria, resolution steps, and approved response templates
+    - file: escalation-contacts.md
+      description: >
+        Contact directory for specialist teams: Complaints, Safeguarding, Data
+        Protection, AI Operations, and Team Leaders
+    - file: regulations.md
+      description: >
+        Regulatory obligations and agent-specific guidance for Consumer Duty,
+        UK GDPR, FCA DISP, and PCI DSS requirements
+  scripts:
+    - file: sentiment_score.py
+      description: >
+        Scores inbound ticket sentiment on a -1 to +1 scale and classifies
+        distress level for the high-sentiment-alert control point
+      used_by_activity: classify-ticket
+    - file: eligibility_check.py
+      description: >
+        Evaluates customer eligibility for standard resolutions against current
+        policy rules (return window, subscription tier, warranty status)
+      used_by_activity: run-eligibility-check
