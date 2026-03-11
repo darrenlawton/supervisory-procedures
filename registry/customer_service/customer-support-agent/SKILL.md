@@ -43,26 +43,16 @@ If `"allowed": false` — halt immediately and log the attempt.
 
 | Activity ID | Description |
 |-------------|-------------|
-| `classify-ticket` | Classify the inbound ticket by type (billing, technical, account, returns, complaints) and priority (low, medium, high, urgent) using the standard taxonomy. Assign an initial sentiment score.
- |
-| `retrieve-account` | Retrieve the customer's account record, order history, and prior support interactions from the CRM system, scoped to information relevant to the current ticket.
- |
-| `search-knowledge-base` | Search the internal knowledge base and approved resolution playbooks for solutions matching the ticket category and customer context.
- |
-| `run-eligibility-check` | Evaluate the customer's eligibility for standard resolutions (e.g. refund policy window, warranty status, subscription tier entitlements) against defined policy rules.
- |
-| `draft-response` | Draft a customer-facing response using the approved tone-of-voice guidelines, populated with ticket-specific details and the proposed resolution or next-step instructions.
- |
-| `apply-standard-resolution` | Apply a policy-defined standard resolution (e.g. issue a prepaid return label, unlock a locked account, resend a confirmation email) where eligibility has been confirmed and no human approval is required under current policy.
- |
-| `generate-escalation-summary` | Produce a structured escalation brief for the human agent including: ticket summary, account context, steps already taken, confidence score, and recommended next action.
- |
-| `log-interaction` | Record the full interaction trajectory — classifications, data sources queried, draft responses generated, resolutions applied, and control points triggered — to the CRM audit trail.
- |
-| `send-response` | Send the approved customer-facing response via the ticket's originating channel (email, chat, or web form) after human or policy gate approval.
- |
-| `close-ticket` | Mark the ticket as resolved in the CRM, set the appropriate resolution code, and trigger the post-interaction customer satisfaction survey.
- |
+| `classify-ticket` | Classify the inbound ticket by type (billing, technical, account, returns, complaints) and priority (low, medium, high, urgent) using the standard taxonomy. Assign an initial sentiment score. |
+| `retrieve-account` | Retrieve the customer's account record, order history, and prior support interactions from the CRM system, scoped to information relevant to the current ticket. |
+| `search-knowledge-base` | Search the internal knowledge base and approved resolution playbooks for solutions matching the ticket category and customer context. |
+| `run-eligibility-check` | Evaluate the customer's eligibility for standard resolutions (e.g. refund policy window, warranty status, subscription tier entitlements) against defined policy rules. |
+| `draft-response` | Draft a customer-facing response using the approved tone-of-voice guidelines, populated with ticket-specific details and the proposed resolution or next-step instructions. |
+| `apply-standard-resolution` | Apply a policy-defined standard resolution (e.g. issue a prepaid return label, unlock a locked account, resend a confirmation email) where eligibility has been confirmed and no human approval is required under current policy. |
+| `generate-escalation-summary` | Produce a structured escalation brief for the human agent including: ticket summary, account context, steps already taken, confidence score, and recommended next action. |
+| `log-interaction` | Record the full interaction trajectory — classifications, data sources queried, draft responses generated, resolutions applied, and control points triggered — to the CRM audit trail. |
+| `send-response` | Send the approved customer-facing response via the ticket's originating channel (email, chat, or web form) after human or policy gate approval. |
+| `close-ticket` | Mark the ticket as resolved in the CRM, set the appropriate resolution code, and trigger the post-interaction customer satisfaction survey. |
 
 ---
 ## What You Must Never Do
